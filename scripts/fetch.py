@@ -217,7 +217,7 @@ def main() -> int:
         print(f"Fetched {len(outages)} outage records")
 
         conn = get_connection()
-        init_db(conn)
+init_db()
 
         insert_snapshot(conn, now_iso, len(outages))
 
