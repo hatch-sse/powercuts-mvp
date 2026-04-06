@@ -54,6 +54,14 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
 
     latest_path = EXPORT_DIR / "postcodes_latest_7d.csv"
     latest_path.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+
+    postcode_only_path = EXPORT_DIR / "postcodes_only_latest_7d.csv"
+    with postcode_only_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["postcode"])
+        for row in rows:
+            writer.writerow([row["postcode"]])
+
     return path, len(rows)
 
 
