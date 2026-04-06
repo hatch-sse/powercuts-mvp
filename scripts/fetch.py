@@ -35,6 +35,7 @@ def extract_outage_list(data: Any) -> list[dict[str, Any]]:
             "items",
             "results",
             "faults",
+            "Faults",
             "powerCuts",
         ]
         for key in preferred_keys:
@@ -49,9 +50,8 @@ def extract_outage_list(data: Any) -> list[dict[str, Any]]:
                 return value
 
         if all(isinstance(value, dict) for value in data.values()) and data:
-            maybe_list = list(data.values())
             print("Using top-level dict values as outage records")
-            return maybe_list
+            return list(data.values())
 
     raise RuntimeError(f"Unexpected JSON structure: {type(data).__name__}")
 
@@ -216,8 +216,8 @@ def main() -> int:
         outages = fetch_json(SOURCE_URL)
         print(f"Fetched {len(outages)} outage records")
 
+        init_db()
         conn = get_connection()
-init_db()
 
         insert_snapshot(conn, now_iso, len(outages))
 
