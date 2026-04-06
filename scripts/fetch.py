@@ -196,16 +196,17 @@ def upsert_outage_postcode(conn: Any, outage_id: str, postcode: str, now_iso: st
     )
 
 
-def insert_snapshot(conn: Any, fetched_at_utc: str, outage_count: int) -> None:
+def insert_snapshot(conn: Any, fetched_at_utc: str, outage_count: int, source_url: str) -> None:
     conn.execute(
         """
         INSERT INTO snapshots (
             fetched_at_utc,
-            outage_count
+            outage_count,
+            source_url
         )
-        VALUES (?, ?)
+        VALUES (?, ?, ?)
         """,
-        (fetched_at_utc, outage_count),
+        (fetched_at_utc, outage_count, source_url),
     )
 
 
@@ -219,7 +220,7 @@ def main() -> int:
         init_db()
         conn = get_connection()
 
-        insert_snapshot(conn, now_iso, len(outages))
+        insert_snapshot(conn, now_iso, len(outages), SOURCE_URL)
 
         postcode_rows = 0
         for outage in outages:
