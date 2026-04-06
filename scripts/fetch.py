@@ -22,6 +22,40 @@ def normalize_postcode(value: str) -> str:
     return " ".join(value.strip().upper().split())
 
 
+def extract_outage_list(data: Any) -> list[dict[str, Any]]:
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+
+    if isinstance(data, dict):
+        print(f"Top-level keys: {list(data.keys())[:20]}")
+
+        preferred_keys = [
+            "outages",
+            "data",
+            "items",
+            "results",
+            "faults",
+            "powerCuts",
+        ]
+        for key in preferred_keys:
+            value = data.get(key)
+            if isinstance(value, list) and all(isinstance(item, dict) for item in value):
+                print(f"Using list from key: {key}")
+                return value
+
+        for key, value in data.items():
+            if isinstance(value, list) and value and all(isinstance(item, dict) for item in value):
+                print(f"Using first matching list-of-dicts from key: {key}")
+                return value
+
+        if all(isinstance(value, dict) for value in data.values()) and data:
+            maybe_list = list(data.values())
+            print("Using top-level dict values as outage records")
+            return maybe_list
+
+    raise RuntimeError(f"Unexpected JSON structure: {type(data).__name__}")
+
+
 def fetch_json(url: str) -> list[dict[str, Any]]:
     req = Request(
         url,
@@ -39,16 +73,8 @@ def fetch_json(url: str) -> list[dict[str, Any]]:
         print(f"Fetched URL: {url}")
         print(f"Top-level JSON type: {type(data).__name__}")
 
-        if isinstance(data, list):
-            return [item for item in data if isinstance(item, dict)]
-
-        if isinstance(data, dict):
-            for key in ("outages", "data", "items", "results"):
-                value = data.get(key)
-                if isinstance(value, list):
-                    return [item for item in value if isinstance(item, dict)]
-
-        raise RuntimeError(f"Unexpected JSON structure: {type(data).__name__}")
+        outages = extract_outage_list(data)
+        return [item for item in outages if isinstance(item, dict)]
 
     except HTTPError as exc:
         raise RuntimeError(f"HTTP error {exc.code} when fetching outage feed") from exc
@@ -64,11 +90,13 @@ def upsert_outage(conn: Any, outage: dict[str, Any], now_iso: str) -> str:
         or outage.get("jobID")
         or outage.get("id")
         or outage.get("outage_id")
+        or outage.get("faultId")
         or ""
     ).strip()
 
     if not outage_id:
-        raise RuntimeError("Encountered outage record without a usable outage ID")
+        raw_name = str(outage.get("name") or "unknown")
+        raise RuntimeError(f"Encountered outage record without a usable outage ID: {raw_name}")
 
     name = outage.get("name")
     outage_type = outage.get("type") or outage.get("faultType")
