@@ -18,40 +18,94 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def normalize_postcode(value: str) -> str:
+    return " ".join(value.strip().upper().split())
+
+
 def fetch_json(url: str) -> list[dict[str, Any]]:
-    req = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urlopen(req, timeout=TIMEOUT_SECONDS) as response:
-        body = response.read().decode("utf-8")
-    data = json.loads(body)
-    if not isinstance(data, list):
-        raise ValueError("Expected top-level JSON list of outages")
-    return data
+    req = Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json",
+        },
+    )
+
+    try:
+        with urlopen(req, timeout=TIMEOUT_SECONDS) as response:
+            raw = response.read().decode("utf-8")
+            data = json.loads(raw)
+
+        print(f"Fetched URL: {url}")
+        print(f"Top-level JSON type: {type(data).__name__}")
+
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+
+        if isinstance(data, dict):
+            for key in ("outages", "data", "items", "results"):
+                value = data.get(key)
+                if isinstance(value, list):
+                    return [item for item in value if isinstance(item, dict)]
+
+        raise RuntimeError(f"Unexpected JSON structure: {type(data).__name__}")
+
+    except HTTPError as exc:
+        raise RuntimeError(f"HTTP error {exc.code} when fetching outage feed") from exc
+    except URLError as exc:
+        raise RuntimeError(f"URL error when fetching outage feed: {exc.reason}") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Response was not valid JSON") from exc
 
 
-def normalize_postcodes(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    postcodes: list[str] = []
-    for item in value:
-        if isinstance(item, str):
-            cleaned = " ".join(item.strip().upper().split())
-            if cleaned:
-                postcodes.append(cleaned)
-    return sorted(set(postcodes))
+def upsert_outage(conn: Any, outage: dict[str, Any], now_iso: str) -> str:
+    outage_id = str(
+        outage.get("reference")
+        or outage.get("jobID")
+        or outage.get("id")
+        or outage.get("outage_id")
+        or ""
+    ).strip()
 
-
-def upsert_outage(conn, outage: dict[str, Any], now_utc: str) -> None:
-    outage_id = str(outage.get("reference") or "").strip()
     if not outage_id:
-        return
+        raise RuntimeError("Encountered outage record without a usable outage ID")
+
+    name = outage.get("name")
+    outage_type = outage.get("type") or outage.get("faultType")
+    network = outage.get("network")
+    customers_affected = outage.get("customersAffected") or outage.get("customers_affected")
+    logged_at_utc = outage.get("loggedAt") or outage.get("faultLogTime")
+    estimated_restoration_utc = (
+        outage.get("estimatedRestoration")
+        or outage.get("estimatedTimeOfRestoration")
+    )
+    resolved = outage.get("resolved")
+
+    if isinstance(resolved, bool):
+        resolved_int = int(resolved)
+    elif resolved in (0, 1):
+        resolved_int = int(resolved)
+    else:
+        resolved_int = 0
+
+    raw_json = json.dumps(outage, separators=(",", ":"), ensure_ascii=False)
 
     conn.execute(
         """
         INSERT INTO outages (
-            outage_id, name, outage_type, network, customers_affected,
-            logged_at_utc, estimated_restoration_utc, resolved,
-            first_seen_utc, last_seen_utc, raw_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            outage_id,
+            name,
+            outage_type,
+            network,
+            customers_affected,
+            logged_at_utc,
+            estimated_restoration_utc,
+            resolved,
+            first_seen_utc,
+            last_seen_utc,
+            raw_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(outage_id) DO UPDATE SET
             name = excluded.name,
             outage_type = excluded.outage_type,
@@ -65,63 +119,96 @@ def upsert_outage(conn, outage: dict[str, Any], now_utc: str) -> None:
         """,
         (
             outage_id,
-            outage.get("name"),
-            outage.get("type"),
-            outage.get("network"),
-            outage.get("customersAffected"),
-            outage.get("loggedAt"),
-            outage.get("estimatedRestoration"),
-            1 if bool(outage.get("resolved")) else 0,
-            now_utc,
-            now_utc,
-            json.dumps(outage, sort_keys=True, ensure_ascii=False),
+            name,
+            outage_type,
+            network,
+            customers_affected,
+            logged_at_utc,
+            estimated_restoration_utc,
+            resolved_int,
+            now_iso,
+            now_iso,
+            raw_json,
         ),
     )
 
-    for postcode in normalize_postcodes(outage.get("affectedAreas", [])):
-        conn.execute(
-            """
-            INSERT INTO outage_postcodes (outage_id, postcode, first_seen_utc, last_seen_utc)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(outage_id, postcode) DO UPDATE SET
-                last_seen_utc = excluded.last_seen_utc
-            """,
-            (outage_id, postcode, now_utc, now_utc),
-        )
+    return outage_id
 
 
-def record_snapshot(conn, fetched_at_utc: str, outage_count: int, success: bool, error_message: str | None = None) -> None:
+def extract_postcodes(outage: dict[str, Any]) -> list[str]:
+    raw_areas = outage.get("affectedAreas", [])
+
+    if not isinstance(raw_areas, list):
+        return []
+
+    postcodes: list[str] = []
+    for value in raw_areas:
+        if isinstance(value, str):
+            normalized = normalize_postcode(value)
+            if normalized:
+                postcodes.append(normalized)
+
+    return sorted(set(postcodes))
+
+
+def upsert_outage_postcode(conn: Any, outage_id: str, postcode: str, now_iso: str) -> None:
     conn.execute(
         """
-        INSERT INTO snapshots (fetched_at_utc, source_url, outage_count, success, error_message)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO outage_postcodes (
+            outage_id,
+            postcode,
+            first_seen_utc,
+            last_seen_utc
+        )
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(outage_id, postcode) DO UPDATE SET
+            last_seen_utc = excluded.last_seen_utc
         """,
-        (fetched_at_utc, SOURCE_URL, outage_count, 1 if success else 0, error_message),
+        (outage_id, postcode, now_iso, now_iso),
+    )
+
+
+def insert_snapshot(conn: Any, fetched_at_utc: str, outage_count: int) -> None:
+    conn.execute(
+        """
+        INSERT INTO snapshots (
+            fetched_at_utc,
+            outage_count
+        )
+        VALUES (?, ?)
+        """,
+        (fetched_at_utc, outage_count),
     )
 
 
 def main() -> int:
-    init_db()
-    now_utc = utc_now_iso()
+    now_iso = utc_now_iso()
 
     try:
         outages = fetch_json(SOURCE_URL)
-    except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
-        with get_connection() as conn:
-            record_snapshot(conn, now_utc, 0, success=False, error_message=str(exc))
-            conn.commit()
+        print(f"Fetched {len(outages)} outage records")
+
+        conn = get_connection()
+        init_db(conn)
+
+        insert_snapshot(conn, now_iso, len(outages))
+
+        postcode_rows = 0
+        for outage in outages:
+            outage_id = upsert_outage(conn, outage, now_iso)
+            for postcode in extract_postcodes(outage):
+                upsert_outage_postcode(conn, outage_id, postcode, now_iso)
+                postcode_rows += 1
+
+        conn.commit()
+        conn.close()
+
+        print(f"Stored {len(outages)} outages and {postcode_rows} outage-postcode rows")
+        return 0
+
+    except Exception as exc:
         print(f"Fetch failed: {exc}", file=sys.stderr)
         return 1
-
-    with get_connection() as conn:
-        for outage in outages:
-            if isinstance(outage, dict):
-                upsert_outage(conn, outage, now_utc)
-        record_snapshot(conn, now_utc, len(outages), success=True)
-        conn.commit()
-
-    print(f"Fetched {len(outages)} outages at {now_utc}")
-    return 0
 
 
 if __name__ == "__main__":
