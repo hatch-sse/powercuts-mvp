@@ -100,8 +100,20 @@ def upsert_outage(conn: Any, outage: dict[str, Any], now_iso: str) -> str:
 
     name = outage.get("name")
     outage_type = outage.get("type") or outage.get("faultType")
-    network = outage.get("network")
-    customers_affected = outage.get("customersAffected") or outage.get("customers_affected")
+
+    network_id = str(outage.get("networkId") or "").lower()
+    if "shepd" in network_id:
+        network = "SHEPD"
+    elif "sepd" in network_id:
+        network = "SEPD"
+    else:
+        network = ""
+
+    customers_affected = (
+        outage.get("customersAffected")
+        or outage.get("affectedCustomerCount")
+        or outage.get("customers_affected")
+    )
     logged_at_utc = outage.get("loggedAt") or outage.get("faultLogTime")
     estimated_restoration_utc = (
         outage.get("estimatedRestoration")
