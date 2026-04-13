@@ -26,14 +26,17 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
     query = """
         SELECT
             op.postcode AS postcode,
+            COALESCE(o.network, '') AS network,
             COUNT(DISTINCT op.outage_id) AS outage_count,
             GROUP_CONCAT(DISTINCT op.outage_id) AS outage_refs,
             MIN(op.first_seen_utc) AS first_seen,
             MAX(op.last_seen_utc) AS last_seen
         FROM outage_postcodes op
+        JOIN outages o
+          ON o.outage_id = op.outage_id
         WHERE op.first_seen_utc <= ?
           AND op.last_seen_utc >= ?
-        GROUP BY op.postcode
+        GROUP BY op.postcode, COALESCE(o.network, '')
         ORDER BY outage_count DESC, op.postcode ASC
     """
 
@@ -42,10 +45,11 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
 
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["postcode", "outage_count", "outage_refs", "first_seen", "last_seen"])
+        writer.writerow(["postcode", "network", "outage_count", "outage_refs", "first_seen", "last_seen"])
         for row in rows:
             writer.writerow([
                 row["postcode"],
+                row["network"],
                 row["outage_count"],
                 row["outage_refs"],
                 row["first_seen"],
@@ -58,9 +62,9 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
     postcode_only_path = EXPORT_DIR / "postcodes_only_latest_7d.csv"
     with postcode_only_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["postcode"])
+        writer.writerow(["postcode", "network"])
         for row in rows:
-            writer.writerow([row["postcode"]])
+            writer.writerow([row["postcode"], row["network"]])
 
     return path, len(rows)
 
@@ -70,7 +74,7 @@ def main() -> int:
     end = utc_now()
     start = end - timedelta(days=7)
     path, row_count = export_for_window(start, end)
-    print(f"Exported {row_count} postcodes to {path}")
+    print(f"Exported {row_count} postcode rows to {path}")
     return 0
 
 
