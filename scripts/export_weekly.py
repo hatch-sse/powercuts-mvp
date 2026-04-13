@@ -27,10 +27,16 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
         SELECT
             op.postcode AS postcode,
             COALESCE(o.network, '') AS network,
+            GROUP_CONCAT(DISTINCT COALESCE(o.outage_type, '')) AS outage_type,
             COUNT(DISTINCT op.outage_id) AS outage_count,
             GROUP_CONCAT(DISTINCT op.outage_id) AS outage_refs,
+            COALESCE(SUM(COALESCE(o.customers_affected, 0)), 0) AS total_customers_affected,
             MIN(op.first_seen_utc) AS first_seen,
-            MAX(op.last_seen_utc) AS last_seen
+            MAX(op.last_seen_utc) AS last_seen,
+            ROUND(
+                (julianday(MAX(op.last_seen_utc)) - julianday(MIN(op.first_seen_utc))) * 24,
+                2
+            ) AS time_off_supply_hours_approx
         FROM outage_postcodes op
         JOIN outages o
           ON o.outage_id = op.outage_id
@@ -45,15 +51,28 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
 
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["postcode", "network", "outage_count", "outage_refs", "first_seen", "last_seen"])
+        writer.writerow([
+            "postcode",
+            "network",
+            "outage_type",
+            "outage_count",
+            "outage_refs",
+            "total_customers_affected",
+            "first_seen",
+            "last_seen",
+            "time_off_supply_hours_approx",
+        ])
         for row in rows:
             writer.writerow([
                 row["postcode"],
                 row["network"],
+                row["outage_type"],
                 row["outage_count"],
                 row["outage_refs"],
+                row["total_customers_affected"],
                 row["first_seen"],
                 row["last_seen"],
+                row["time_off_supply_hours_approx"],
             ])
 
     latest_path = EXPORT_DIR / "postcodes_latest_7d.csv"
