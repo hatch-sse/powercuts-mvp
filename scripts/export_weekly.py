@@ -24,26 +24,39 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
     path = EXPORT_DIR / filename
 
     query = """
+        WITH outage_postcode_durations AS (
+            SELECT
+                op.postcode AS postcode,
+                COALESCE(o.network, '') AS network,
+                op.outage_id AS outage_id,
+                COALESCE(o.outage_type, '') AS outage_type,
+                COALESCE(o.customers_affected, 0) AS customers_affected,
+                MIN(op.first_seen_utc) AS outage_first_seen,
+                MAX(op.last_seen_utc) AS outage_last_seen,
+                ROUND(
+                    (julianday(MAX(op.last_seen_utc)) - julianday(MIN(op.first_seen_utc))) * 24,
+                    2
+                ) AS outage_duration_hours_approx
+            FROM outage_postcodes op
+            JOIN outages o
+              ON o.outage_id = op.outage_id
+            WHERE op.first_seen_utc <= ?
+              AND op.last_seen_utc >= ?
+            GROUP BY op.postcode, COALESCE(o.network, ''), op.outage_id
+        )
         SELECT
-            op.postcode AS postcode,
-            COALESCE(o.network, '') AS network,
-            GROUP_CONCAT(DISTINCT COALESCE(o.outage_type, '')) AS outage_type,
-            COUNT(DISTINCT op.outage_id) AS outage_count,
-            GROUP_CONCAT(DISTINCT op.outage_id) AS outage_refs,
-            COALESCE(SUM(COALESCE(o.customers_affected, 0)), 0) AS total_customers_affected,
-            MIN(op.first_seen_utc) AS first_seen,
-            MAX(op.last_seen_utc) AS last_seen,
-            ROUND(
-                (julianday(MAX(op.last_seen_utc)) - julianday(MIN(op.first_seen_utc))) * 24,
-                2
-            ) AS time_off_supply_hours_approx
-        FROM outage_postcodes op
-        JOIN outages o
-          ON o.outage_id = op.outage_id
-        WHERE op.first_seen_utc <= ?
-          AND op.last_seen_utc >= ?
-        GROUP BY op.postcode, COALESCE(o.network, '')
-        ORDER BY outage_count DESC, op.postcode ASC
+            postcode,
+            network,
+            GROUP_CONCAT(DISTINCT outage_type) AS outage_type,
+            COUNT(DISTINCT outage_id) AS outage_count,
+            GROUP_CONCAT(DISTINCT outage_id) AS outage_refs,
+            COALESCE(SUM(customers_affected), 0) AS total_customers_affected,
+            MIN(outage_first_seen) AS first_seen,
+            MAX(outage_last_seen) AS last_seen,
+            ROUND(SUM(outage_duration_hours_approx), 2) AS time_off_supply_hours_total_approx
+        FROM outage_postcode_durations
+        GROUP BY postcode, network
+        ORDER BY time_off_supply_hours_total_approx DESC, outage_count DESC, postcode ASC
     """
 
     with get_connection() as conn:
@@ -60,7 +73,7 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
             "total_customers_affected",
             "first_seen",
             "last_seen",
-            "time_off_supply_hours_approx",
+            "time_off_supply_hours_total_approx",
         ])
         for row in rows:
             writer.writerow([
@@ -72,7 +85,7 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
                 row["total_customers_affected"],
                 row["first_seen"],
                 row["last_seen"],
-                row["time_off_supply_hours_approx"],
+                row["time_off_supply_hours_total_approx"],
             ])
 
     latest_path = EXPORT_DIR / "postcodes_latest_7d.csv"
