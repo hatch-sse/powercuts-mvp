@@ -36,6 +36,9 @@ jobs:
       - name: Run weekly export
         run: python scripts/export_weekly.py
 
+      - name: Run annual and monthly exports
+        run: python scripts/export_periodic.py
+
       - name: Commit updated data
         run: |
           git config user.name "github-actions[bot]"
