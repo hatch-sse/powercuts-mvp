@@ -59,7 +59,7 @@ function colourFor(value, maxValue) {
   const max = Math.log10(num(maxValue) + 1) || 1;
   const t = Math.max(0, Math.min(1, v / max));
 
-  // SSEN-ish scale: pale cyan to deep navy
+  // SSEN-style scale: pale cyan to deep navy
   const r = Math.round(210 - 185 * t);
   const g = Math.round(242 - 160 * t);
   const b = Math.round(240 - 95 * t);
@@ -91,10 +91,10 @@ function createGeometryLayer(row, colour) {
   if (!latLngs.length) return null;
 
   const options = {
-    color: "#ffffff",
-    weight: 0.45,
+    color: "#003865",
+    weight: 0.8,
     fillColor: colour,
-    fillOpacity: num(row[selectedMetric()]) > 0 ? 0.8 : 0.05,
+    fillOpacity: num(row[selectedMetric()]) > 0 ? 0.72 : 0.05,
   };
 
   if (row.geometry.type === "MultiPolygon") {
@@ -137,6 +137,7 @@ function updateTable() {
   const metric = selectedMetric();
 
   const rows = getFilteredSectors()
+    .filter((row) => num(row[metric]) > 0)
     .sort((a, b) => num(b[metric]) - num(a[metric]))
     .slice(0, 20);
 
@@ -165,7 +166,7 @@ function updateTable() {
 
 function updateMap() {
   const metric = selectedMetric();
-  const sectors = getFilteredSectors();
+  const sectors = getFilteredSectors().filter((row) => num(row[metric]) > 0);
   const maxValue = Math.max(...sectors.map((row) => num(row[metric])), 0);
 
   if (state.layer) {
@@ -173,6 +174,7 @@ function updateMap() {
   }
 
   const group = L.featureGroup();
+  let drawnCount = 0;
 
   for (const row of sectors) {
     const value = num(row[metric]);
@@ -180,6 +182,13 @@ function updateMap() {
     const layer = createGeometryLayer(row, colour);
 
     if (!layer) continue;
+
+    layer.setStyle({
+      color: "#003865",
+      weight: 0.8,
+      fillColor: colour,
+      fillOpacity: 0.72,
+    });
 
     layer.bindPopup(`
       <strong>${row.postcode_sector}</strong><br/>
@@ -191,14 +200,18 @@ function updateMap() {
     `);
 
     layer.addTo(group);
+    drawnCount += 1;
   }
 
   group.addTo(state.map);
   state.layer = group;
 
-  if (sectors.length) {
+  console.log(`Drawn sector polygons: ${drawnCount}`);
+
+  if (drawnCount > 0) {
     state.map.fitBounds(group.getBounds(), {
-      padding: [20, 20],
+      padding: [30, 30],
+      maxZoom: 9,
     });
   }
 }
