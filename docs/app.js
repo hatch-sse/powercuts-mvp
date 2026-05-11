@@ -43,7 +43,9 @@ function selectedMetric() {
 }
 
 function normalisePostcode(value) {
-  return String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
+  const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (compact.length <= 3) return compact;
+  return `${compact.slice(0, -3)} ${compact.slice(-3)}`;
 }
 
 function postcodeToSector(postcode) {
@@ -68,6 +70,15 @@ function addDays(date, days) {
 
 function toDateInputValue(date) {
   return date.toISOString().slice(0, 10);
+}
+
+function formatDateUK(date) {
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function clampDate(date, minDate, maxDate) {
@@ -355,9 +366,11 @@ function handlePostcodeLookup() {
     return;
   }
 
+  input.value = postcode;
+
   const sector = postcodeToSector(postcode);
   if (!sector) {
-    result.innerHTML = `<strong>${postcode}</strong><br/>Please enter a full postcode with a space, for example AB31 4AA.`;
+    result.innerHTML = `<strong>${postcode}</strong><br/>Please enter a full postcode, for example AB31 4AA.`;
     return;
   }
 
@@ -428,7 +441,7 @@ function initialiseDateInputs() {
   endInput.value = toDateInputValue(maxDate);
 
   document.getElementById("dateRangeNote").textContent =
-    `Available data: ${toDateInputValue(minDate)} to ${toDateInputValue(maxDate)}. Date filtering is limited to the rolling ${state.payload.rolling_days || 365} days.`;
+    `Available data: ${formatDateUK(minDate)} to ${formatDateUK(maxDate)}. Date filtering is limited to the rolling ${state.payload.rolling_days || 365} days.`;
 }
 
 async function loadData() {
