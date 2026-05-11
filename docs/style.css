@@ -30,11 +30,9 @@ body {
   overflow: hidden;
   min-height: 360px;
   padding: 30px;
-  border-radius: 0 0 30px 30px;
-  background:
-    radial-gradient(circle at 68% 78%, rgba(103, 183, 201, 0.18), transparent 26%),
-    linear-gradient(135deg, #20384a, #142635 64%);
-  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 0;
+  background: transparent;
+  border: 0;
 }
 
 .portal-hero::after {
