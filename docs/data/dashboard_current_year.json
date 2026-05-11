@@ -1,8 +1,14 @@
 {
   "label": "Current year",
+  "generated_at": "2026-05-11T14:30:26Z",
   "source_sector_file": "data/exports/sectors/postcode_sectors_current_year.csv",
+  "valid_networks": [
+    "SEPD",
+    "SHEPD"
+  ],
   "mapping_granularity": "postcode_area",
   "notes": [
+    "Only SHEPD and SEPD rows are included.",
     "Outage sector data is aggregated to the geography supported by the mapping workbook.",
     "Time off supply is approximate and based on captured first/last seen outage windows."
   ],
@@ -25,7 +31,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 1065.0,
       "total_customers_affected": 401602.0,
-      "time_off_supply_hours_total_approx": 3431.13,
+      "time_off_supply_hours_total_approx": 3434.2,
       "sector_count": 76,
       "centroid_lat": 50.92105897247706,
       "centroid_lon": -1.370493917431193,
@@ -37,7 +43,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 772.0,
       "total_customers_affected": 74545.0,
-      "time_off_supply_hours_total_approx": 3453.43,
+      "time_off_supply_hours_total_approx": 3458.99,
       "sector_count": 53,
       "centroid_lat": 51.19438997446809,
       "centroid_lon": -0.7164086340425532,
@@ -49,7 +55,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 803.0,
       "total_customers_affected": 264779.0,
-      "time_off_supply_hours_total_approx": 2721.65,
+      "time_off_supply_hours_total_approx": 2722.87,
       "sector_count": 68,
       "centroid_lat": 50.86642579432624,
       "centroid_lon": -0.9820734539007091,
@@ -61,7 +67,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 671.0,
       "total_customers_affected": 124462.0,
-      "time_off_supply_hours_total_approx": 2604.9,
+      "time_off_supply_hours_total_approx": 2621.61,
       "sector_count": 33,
       "centroid_lat": 51.16490463636364,
       "centroid_lon": -2.478510463203464,
@@ -73,7 +79,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 1230.0,
       "total_customers_affected": 1965079.0,
-      "time_off_supply_hours_total_approx": 2619.76,
+      "time_off_supply_hours_total_approx": 2625.34,
       "sector_count": 60,
       "centroid_lat": 51.81331626446281,
       "centroid_lon": -1.279848152892562,
@@ -97,7 +103,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 1205.0,
       "total_customers_affected": 247681.0,
-      "time_off_supply_hours_total_approx": 2763.3,
+      "time_off_supply_hours_total_approx": 2802.56,
       "sector_count": 82,
       "centroid_lat": 51.41702085650224,
       "centroid_lon": -1.069835739910314,
@@ -169,7 +175,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 571.0,
       "total_customers_affected": 48149.0,
-      "time_off_supply_hours_total_approx": 1666.88,
+      "time_off_supply_hours_total_approx": 1667.5,
       "sector_count": 45,
       "centroid_lat": 57.27411485714286,
       "centroid_lon": -5.862509571428572,
@@ -181,7 +187,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 940.0,
       "total_customers_affected": 262386.0,
-      "time_off_supply_hours_total_approx": 1862.65,
+      "time_off_supply_hours_total_approx": 1863.27,
       "sector_count": 53,
       "centroid_lat": 51.48959254268292,
       "centroid_lon": -1.910538896341463,
@@ -205,7 +211,7 @@
       "outage_type": "HV,LV",
       "outage_count": 294.0,
       "total_customers_affected": 186640.0,
-      "time_off_supply_hours_total_approx": 473.49,
+      "time_off_supply_hours_total_approx": 480.2,
       "sector_count": 20,
       "centroid_lat": 51.53482892741935,
       "centroid_lon": -0.4193048709677419,
@@ -241,7 +247,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 100.0,
       "total_customers_affected": 2740.0,
-      "time_off_supply_hours_total_approx": 294.91,
+      "time_off_supply_hours_total_approx": 295.52,
       "sector_count": 9,
       "centroid_lat": 59.3706115,
       "centroid_lon": -2.413459333333333,
@@ -313,7 +319,7 @@
       "outage_type": "HV,LV,PSI",
       "outage_count": 43.0,
       "total_customers_affected": 3032.0,
-      "time_off_supply_hours_total_approx": 58.58,
+      "time_off_supply_hours_total_approx": 61.06,
       "sector_count": 2,
       "centroid_lat": 51.10119583561644,
       "centroid_lon": -0.2450676392694064,
@@ -554,20 +560,20 @@
       "time_off_supply_hours_total_approx": "290.37"
     },
     {
+      "postcode_sector": "RG10 0",
+      "network": "SEPD",
+      "outage_type": "HV,LV,PSI",
+      "outage_count": "121",
+      "total_customers_affected": "17439",
+      "time_off_supply_hours_total_approx": "281.49"
+    },
+    {
       "postcode_sector": "AB54 4",
       "network": "SHEPD",
       "outage_type": "PSI",
       "outage_count": "62",
       "total_customers_affected": "13481",
       "time_off_supply_hours_total_approx": "275.26"
-    },
-    {
-      "postcode_sector": "RG10 0",
-      "network": "SEPD",
-      "outage_type": "HV,LV,PSI",
-      "outage_count": "121",
-      "total_customers_affected": "17439",
-      "time_off_supply_hours_total_approx": "267.97"
     },
     {
       "postcode_sector": "GU32 2",
@@ -618,6 +624,14 @@
       "time_off_supply_hours_total_approx": "196.96"
     },
     {
+      "postcode_sector": "BA11 2",
+      "network": "SEPD",
+      "outage_type": "HV,LV",
+      "outage_count": "43",
+      "total_customers_affected": "5402",
+      "time_off_supply_hours_total_approx": "190.42"
+    },
+    {
       "postcode_sector": "IV22 2",
       "network": "SHEPD",
       "outage_type": "HV,PSI",
@@ -648,14 +662,6 @@
       "outage_count": "64",
       "total_customers_affected": "10032",
       "time_off_supply_hours_total_approx": "181.04"
-    },
-    {
-      "postcode_sector": "BA11 2",
-      "network": "SEPD",
-      "outage_type": "HV,LV",
-      "outage_count": "43",
-      "total_customers_affected": "5402",
-      "time_off_supply_hours_total_approx": "178.02"
     },
     {
       "postcode_sector": "SN15 3",
@@ -959,7 +965,7 @@
       "outage_type": "HV,PSI",
       "outage_count": "33",
       "total_customers_affected": "870",
-      "time_off_supply_hours_total_approx": "120.0"
+      "time_off_supply_hours_total_approx": "120.61"
     },
     {
       "postcode_sector": "AB53 8",
@@ -1162,6 +1168,14 @@
       "time_off_supply_hours_total_approx": "96.6"
     },
     {
+      "postcode_sector": "RG30 3",
+      "network": "SEPD",
+      "outage_type": "HV,LV",
+      "outage_count": "32",
+      "total_customers_affected": "522",
+      "time_off_supply_hours_total_approx": "96.25"
+    },
+    {
       "postcode_sector": "AB52 6",
       "network": "SHEPD",
       "outage_type": "PSI",
@@ -1216,14 +1230,6 @@
       "outage_count": "31",
       "total_customers_affected": "1623",
       "time_off_supply_hours_total_approx": "92.84"
-    },
-    {
-      "postcode_sector": "RG30 3",
-      "network": "SEPD",
-      "outage_type": "HV,LV",
-      "outage_count": "32",
-      "total_customers_affected": "522",
-      "time_off_supply_hours_total_approx": "92.59"
     },
     {
       "postcode_sector": "GL7 4",
@@ -1383,7 +1389,7 @@
       "outage_type": "HV,PSI",
       "outage_count": "21",
       "total_customers_affected": "663",
-      "time_off_supply_hours_total_approx": "79.2"
+      "time_off_supply_hours_total_approx": "79.82"
     },
     {
       "postcode_sector": "SO50 5",
@@ -1424,6 +1430,14 @@
       "outage_count": "9",
       "total_customers_affected": "123",
       "time_off_supply_hours_total_approx": "77.43"
+    },
+    {
+      "postcode_sector": "RG20 8",
+      "network": "SEPD",
+      "outage_type": "HV,PSI",
+      "outage_count": "26",
+      "total_customers_affected": "1887",
+      "time_off_supply_hours_total_approx": "77.27"
     },
     {
       "postcode_sector": "KA27 8",
@@ -1504,14 +1518,6 @@
       "outage_count": "5",
       "total_customers_affected": "70",
       "time_off_supply_hours_total_approx": "74.5"
-    },
-    {
-      "postcode_sector": "RG20 8",
-      "network": "SEPD",
-      "outage_type": "HV,PSI",
-      "outage_count": "26",
-      "total_customers_affected": "1887",
-      "time_off_supply_hours_total_approx": "73.55"
     },
     {
       "postcode_sector": "TW8 8",
@@ -1823,7 +1829,7 @@
       "outage_type": "LV,PSI",
       "outage_count": "17",
       "total_customers_affected": "865",
-      "time_off_supply_hours_total_approx": "57.77"
+      "time_off_supply_hours_total_approx": "58.39"
     },
     {
       "postcode_sector": "GU31 5",
@@ -1840,6 +1846,14 @@
       "outage_count": "14",
       "total_customers_affected": "712",
       "time_off_supply_hours_total_approx": "56.86"
+    },
+    {
+      "postcode_sector": "RH14 9",
+      "network": "SEPD",
+      "outage_type": "HV,LV,PSI",
+      "outage_count": "30",
+      "total_customers_affected": "722",
+      "time_off_supply_hours_total_approx": "55.8"
     },
     {
       "postcode_sector": "PO14 4",
@@ -1882,6 +1896,14 @@
       "time_off_supply_hours_total_approx": "54.28"
     },
     {
+      "postcode_sector": "OX1 5",
+      "network": "SEPD",
+      "outage_type": "HV,LV,PSI",
+      "outage_count": "52",
+      "total_customers_affected": "34405",
+      "time_off_supply_hours_total_approx": "54.14"
+    },
+    {
       "postcode_sector": "BH1 1",
       "network": "SEPD",
       "outage_type": "HV,LV",
@@ -1896,14 +1918,6 @@
       "outage_count": "11",
       "total_customers_affected": "149",
       "time_off_supply_hours_total_approx": "54.06"
-    },
-    {
-      "postcode_sector": "RH14 9",
-      "network": "SEPD",
-      "outage_type": "HV,LV,PSI",
-      "outage_count": "30",
-      "total_customers_affected": "722",
-      "time_off_supply_hours_total_approx": "53.32"
     },
     {
       "postcode_sector": "KY13 0",
@@ -1986,14 +2000,6 @@
       "time_off_supply_hours_total_approx": "51.31"
     },
     {
-      "postcode_sector": "OX1 5",
-      "network": "SEPD",
-      "outage_type": "HV,LV,PSI",
-      "outage_count": "52",
-      "total_customers_affected": "34405",
-      "time_off_supply_hours_total_approx": "51.04"
-    },
-    {
       "postcode_sector": "BH8 9",
       "network": "SEPD",
       "outage_type": "HV,LV",
@@ -2008,6 +2014,14 @@
       "outage_count": "14",
       "total_customers_affected": "518",
       "time_off_supply_hours_total_approx": "50.26"
+    },
+    {
+      "postcode_sector": "UB8 1",
+      "network": "SEPD",
+      "outage_type": "LV",
+      "outage_count": "28",
+      "total_customers_affected": "580",
+      "time_off_supply_hours_total_approx": "50.06"
     },
     {
       "postcode_sector": "RG9 3",
@@ -2234,14 +2248,6 @@
       "time_off_supply_hours_total_approx": "43.7"
     },
     {
-      "postcode_sector": "UB8 1",
-      "network": "SEPD",
-      "outage_type": "LV",
-      "outage_count": "28",
-      "total_customers_affected": "580",
-      "time_off_supply_hours_total_approx": "43.35"
-    },
-    {
       "postcode_sector": "OX12 0",
       "network": "SEPD",
       "outage_type": "LV",
@@ -2280,6 +2286,14 @@
       "outage_count": "28",
       "total_customers_affected": "1549",
       "time_off_supply_hours_total_approx": "42.04"
+    },
+    {
+      "postcode_sector": "SO52 9",
+      "network": "SEPD",
+      "outage_type": "LV,PSI",
+      "outage_count": "14",
+      "total_customers_affected": "456",
+      "time_off_supply_hours_total_approx": "41.39"
     },
     {
       "postcode_sector": "UB3 1",
@@ -2354,14 +2368,6 @@
       "time_off_supply_hours_total_approx": "40.17"
     },
     {
-      "postcode_sector": "SO52 9",
-      "network": "SEPD",
-      "outage_type": "LV,PSI",
-      "outage_count": "14",
-      "total_customers_affected": "456",
-      "time_off_supply_hours_total_approx": "40.15"
-    },
-    {
       "postcode_sector": "DT4 9",
       "network": "SEPD",
       "outage_type": "HV,LV,PSI",
@@ -2402,6 +2408,14 @@
       "time_off_supply_hours_total_approx": "38.44"
     },
     {
+      "postcode_sector": "RG14 2",
+      "network": "SEPD",
+      "outage_type": "LV,PSI",
+      "outage_count": "8",
+      "total_customers_affected": "322",
+      "time_off_supply_hours_total_approx": "38.34"
+    },
+    {
       "postcode_sector": "SP8 4",
       "network": "SEPD",
       "outage_type": "LV,PSI",
@@ -2440,14 +2454,6 @@
       "outage_count": "8",
       "total_customers_affected": "370",
       "time_off_supply_hours_total_approx": "37.46"
-    },
-    {
-      "postcode_sector": "RG14 2",
-      "network": "SEPD",
-      "outage_type": "LV,PSI",
-      "outage_count": "8",
-      "total_customers_affected": "322",
-      "time_off_supply_hours_total_approx": "37.1"
     },
     {
       "postcode_sector": "PO20 1",
@@ -2552,6 +2558,14 @@
       "outage_count": "5",
       "total_customers_affected": "100",
       "time_off_supply_hours_total_approx": "34.45"
+    },
+    {
+      "postcode_sector": "GU8 5",
+      "network": "SEPD",
+      "outage_type": "PSI",
+      "outage_count": "8",
+      "total_customers_affected": "370",
+      "time_off_supply_hours_total_approx": "34.38"
     },
     {
       "postcode_sector": "PO22 9",
@@ -2722,14 +2736,6 @@
       "time_off_supply_hours_total_approx": "30.8"
     },
     {
-      "postcode_sector": "GU8 5",
-      "network": "SEPD",
-      "outage_type": "PSI",
-      "outage_count": "8",
-      "total_customers_affected": "370",
-      "time_off_supply_hours_total_approx": "30.66"
-    },
-    {
       "postcode_sector": "SN6 8",
       "network": "SEPD",
       "outage_type": "HV,LV,PSI",
@@ -2808,6 +2814,14 @@
       "outage_count": "9",
       "total_customers_affected": "375",
       "time_off_supply_hours_total_approx": "29.74"
+    },
+    {
+      "postcode_sector": "BA8 0",
+      "network": "SEPD",
+      "outage_type": "LV,PSI",
+      "outage_count": "10",
+      "total_customers_affected": "1165",
+      "time_off_supply_hours_total_approx": "29.48"
     },
     {
       "postcode_sector": "BH15 2",
@@ -2922,14 +2936,6 @@
       "time_off_supply_hours_total_approx": "27.75"
     },
     {
-      "postcode_sector": "BA8 0",
-      "network": "SEPD",
-      "outage_type": "LV,PSI",
-      "outage_count": "10",
-      "total_customers_affected": "1165",
-      "time_off_supply_hours_total_approx": "27.65"
-    },
-    {
       "postcode_sector": "AB42 3",
       "network": "SHEPD",
       "outage_type": "PSI",
@@ -3042,6 +3048,14 @@
       "time_off_supply_hours_total_approx": "25.71"
     },
     {
+      "postcode_sector": "SO42 7",
+      "network": "SEPD",
+      "outage_type": "HV,LV,PSI",
+      "outage_count": "8",
+      "total_customers_affected": "311",
+      "time_off_supply_hours_total_approx": "25.69"
+    },
+    {
       "postcode_sector": "W5 3",
       "network": "SEPD",
       "outage_type": "HV",
@@ -3130,14 +3144,6 @@
       "time_off_supply_hours_total_approx": "23.89"
     },
     {
-      "postcode_sector": "SO42 7",
-      "network": "SEPD",
-      "outage_type": "HV,LV,PSI",
-      "outage_count": "8",
-      "total_customers_affected": "311",
-      "time_off_supply_hours_total_approx": "23.86"
-    },
-    {
       "postcode_sector": "SN25 2",
       "network": "SEPD",
       "outage_type": "HV,PSI",
@@ -3218,12 +3224,36 @@
       "time_off_supply_hours_total_approx": "22.96"
     },
     {
+      "postcode_sector": "BA15 2",
+      "network": "SEPD",
+      "outage_type": "PSI",
+      "outage_count": "4",
+      "total_customers_affected": "140",
+      "time_off_supply_hours_total_approx": "22.92"
+    },
+    {
+      "postcode_sector": "OX2 6",
+      "network": "SEPD",
+      "outage_type": "PSI",
+      "outage_count": "4",
+      "total_customers_affected": "96",
+      "time_off_supply_hours_total_approx": "22.92"
+    },
+    {
       "postcode_sector": "OX44 9",
       "network": "SEPD",
       "outage_type": "HV,PSI",
       "outage_count": "11",
       "total_customers_affected": "30767",
       "time_off_supply_hours_total_approx": "22.7"
+    },
+    {
+      "postcode_sector": "RG8 8",
+      "network": "SEPD",
+      "outage_type": "HV,LV,PSI",
+      "outage_count": "21",
+      "total_customers_affected": "564",
+      "time_off_supply_hours_total_approx": "22.66"
     },
     {
       "postcode_sector": "SO53 2",
@@ -3264,14 +3294,6 @@
       "outage_count": "4",
       "total_customers_affected": "200",
       "time_off_supply_hours_total_approx": "22.32"
-    },
-    {
-      "postcode_sector": "RG8 8",
-      "network": "SEPD",
-      "outage_type": "HV,LV,PSI",
-      "outage_count": "21",
-      "total_customers_affected": "564",
-      "time_off_supply_hours_total_approx": "22.05"
     },
     {
       "postcode_sector": "OX29 7",
@@ -3378,22 +3400,6 @@
       "time_off_supply_hours_total_approx": "20.46"
     },
     {
-      "postcode_sector": "BA15 2",
-      "network": "SEPD",
-      "outage_type": "PSI",
-      "outage_count": "4",
-      "total_customers_affected": "140",
-      "time_off_supply_hours_total_approx": "20.44"
-    },
-    {
-      "postcode_sector": "OX2 6",
-      "network": "SEPD",
-      "outage_type": "PSI",
-      "outage_count": "4",
-      "total_customers_affected": "96",
-      "time_off_supply_hours_total_approx": "20.44"
-    },
-    {
       "postcode_sector": "AB51 3",
       "network": "SHEPD",
       "outage_type": "LV",
@@ -3490,6 +3496,14 @@
       "time_off_supply_hours_total_approx": "19.41"
     },
     {
+      "postcode_sector": "RG19 8",
+      "network": "SEPD",
+      "outage_type": "LV,PSI",
+      "outage_count": "7",
+      "total_customers_affected": "117",
+      "time_off_supply_hours_total_approx": "19.38"
+    },
+    {
       "postcode_sector": "BH15 1",
       "network": "SEPD",
       "outage_type": "HV,LV",
@@ -3536,6 +3550,14 @@
       "outage_count": "4",
       "total_customers_affected": "68",
       "time_off_supply_hours_total_approx": "18.92"
+    },
+    {
+      "postcode_sector": "RG7 2",
+      "network": "SEPD",
+      "outage_type": "HV,LV",
+      "outage_count": "24",
+      "total_customers_affected": "2670",
+      "time_off_supply_hours_total_approx": "18.86"
     },
     {
       "postcode_sector": "KW9 6",
@@ -3592,14 +3614,6 @@
       "outage_count": "10",
       "total_customers_affected": "256",
       "time_off_supply_hours_total_approx": "18.15"
-    },
-    {
-      "postcode_sector": "RG19 8",
-      "network": "SEPD",
-      "outage_type": "LV,PSI",
-      "outage_count": "7",
-      "total_customers_affected": "117",
-      "time_off_supply_hours_total_approx": "18.14"
     },
     {
       "postcode_sector": "IV2 5",
@@ -4186,6 +4200,14 @@
       "time_off_supply_hours_total_approx": "11.58"
     },
     {
+      "postcode_sector": "PO9 4",
+      "network": "SEPD",
+      "outage_type": "LV",
+      "outage_count": "8",
+      "total_customers_affected": "100",
+      "time_off_supply_hours_total_approx": "11.54"
+    },
+    {
       "postcode_sector": "RG18 3",
       "network": "SEPD",
       "outage_type": "LV",
@@ -4306,14 +4328,6 @@
       "time_off_supply_hours_total_approx": "10.57"
     },
     {
-      "postcode_sector": "PO9 4",
-      "network": "SEPD",
-      "outage_type": "LV",
-      "outage_count": "8",
-      "total_customers_affected": "100",
-      "time_off_supply_hours_total_approx": "10.32"
-    },
-    {
       "postcode_sector": "SP3 6",
       "network": "SEPD",
       "outage_type": "PSI",
@@ -4376,6 +4390,14 @@
       "outage_count": "2",
       "total_customers_affected": "367",
       "time_off_supply_hours_total_approx": "9.97"
+    },
+    {
+      "postcode_sector": "GU27 2",
+      "network": "SEPD",
+      "outage_type": "LV",
+      "outage_count": "21",
+      "total_customers_affected": "240",
+      "time_off_supply_hours_total_approx": "9.74"
     },
     {
       "postcode_sector": "GU34 3",
@@ -4488,14 +4510,6 @@
       "outage_count": "3",
       "total_customers_affected": "33",
       "time_off_supply_hours_total_approx": "8.56"
-    },
-    {
-      "postcode_sector": "GU27 2",
-      "network": "SEPD",
-      "outage_type": "LV",
-      "outage_count": "21",
-      "total_customers_affected": "240",
-      "time_off_supply_hours_total_approx": "8.52"
     },
     {
       "postcode_sector": "PO16 8",
@@ -5018,6 +5032,30 @@
       "time_off_supply_hours_total_approx": "5.76"
     },
     {
+      "postcode_sector": "IV16 9",
+      "network": "SHEPD",
+      "outage_type": "PSI",
+      "outage_count": "1",
+      "total_customers_affected": "5",
+      "time_off_supply_hours_total_approx": "5.73"
+    },
+    {
+      "postcode_sector": "RG20 2",
+      "network": "SEPD",
+      "outage_type": "PSI",
+      "outage_count": "1",
+      "total_customers_affected": "62",
+      "time_off_supply_hours_total_approx": "5.73"
+    },
+    {
+      "postcode_sector": "RG20 5",
+      "network": "SEPD",
+      "outage_type": "PSI",
+      "outage_count": "1",
+      "total_customers_affected": "28",
+      "time_off_supply_hours_total_approx": "5.73"
+    },
+    {
       "postcode_sector": "SL2 3",
       "network": "SEPD",
       "outage_type": "PSI",
@@ -5234,30 +5272,6 @@
       "time_off_supply_hours_total_approx": "5.12"
     },
     {
-      "postcode_sector": "IV16 9",
-      "network": "SHEPD",
-      "outage_type": "PSI",
-      "outage_count": "1",
-      "total_customers_affected": "5",
-      "time_off_supply_hours_total_approx": "5.11"
-    },
-    {
-      "postcode_sector": "RG20 2",
-      "network": "SEPD",
-      "outage_type": "PSI",
-      "outage_count": "1",
-      "total_customers_affected": "62",
-      "time_off_supply_hours_total_approx": "5.11"
-    },
-    {
-      "postcode_sector": "RG20 5",
-      "network": "SEPD",
-      "outage_type": "PSI",
-      "outage_count": "1",
-      "total_customers_affected": "28",
-      "time_off_supply_hours_total_approx": "5.11"
-    },
-    {
       "postcode_sector": "SL5 0",
       "network": "SEPD",
       "outage_type": "LV",
@@ -5288,14 +5302,6 @@
       "outage_count": "5",
       "total_customers_affected": "1153",
       "time_off_supply_hours_total_approx": "4.84"
-    },
-    {
-      "postcode_sector": "RG7 2",
-      "network": "SEPD",
-      "outage_type": "HV,LV",
-      "outage_count": "24",
-      "total_customers_affected": "2670",
-      "time_off_supply_hours_total_approx": "4.83"
     },
     {
       "postcode_sector": "SO14 3",
