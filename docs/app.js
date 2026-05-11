@@ -84,13 +84,6 @@ function compact(value) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-function postcodeToSector(postcode) {
-  const cleaned = normalisePostcode(postcode);
-  const parts = cleaned.split(" ");
-  if (parts.length !== 2 || !parts[1]) return "";
-  return `${parts[0]} ${parts[1][0]}`;
-}
-
 function parseDateOnly(value) {
   if (!value) return null;
   const [year, month, day] = value.split("-").map(Number);
@@ -296,7 +289,6 @@ function updateCards() {
   const customers = sectors.reduce((sum, row) => sum + num(row.total_customers_affected), 0);
   const hours = sectors.reduce((sum, row) => sum + num(row.time_off_supply_hours_total_approx), 0);
 
-  document.getElementById("areasCard").textContent = sectors.length.toLocaleString("en-GB");
   document.getElementById("sectorsCard").textContent = new Set(sectors.map((row) => row.postcode_sector).filter(Boolean)).size.toLocaleString("en-GB");
   document.getElementById("outagesCard").textContent = fmt(totalOutages);
   document.getElementById("customersCard").textContent = fmt(customers);
