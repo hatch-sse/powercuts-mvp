@@ -48,6 +48,13 @@ body {
   max-height: 42px;
 }
 
+.freshness {
+  margin: 12px 0 0;
+  color: #bdebf0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   text-transform: uppercase;
@@ -71,11 +78,28 @@ h1 {
   line-height: 1.5;
 }
 
-.controls {
+.controls, .filter-card {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.filter-card, .insight-card, .lookup-card, .about-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  margin: 0 0 24px;
+}
+
+.filter-card {
+  justify-content: flex-start;
+  align-items: end;
+}
+
+.insight-card {
+  border-left: 6px solid var(--accent);
 }
 
 label {
@@ -88,7 +112,7 @@ label {
 
 select, input, button, textarea { font: inherit; }
 
-select, input[type="date"], input[type="text"] {
+select, input[type="date"], input[type="text"], input[type="number"] {
   min-width: 150px;
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -102,7 +126,7 @@ select, input[type="date"], input[type="text"] {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-  margin: 18px 0 0;
+  margin: 18px 0 24px;
 }
 
 .cards {
@@ -142,11 +166,6 @@ select, input[type="date"], input[type="text"] {
   grid-template-columns: 1fr auto;
   gap: 18px;
   align-items: center;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 18px;
-  margin: 0 0 24px;
 }
 
 .lookup-controls {
@@ -166,16 +185,71 @@ select, input[type="date"], input[type="text"] {
 
 .dashboard {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 18px;
+  align-items: stretch;
+}
+
+.map-wrap {
+  position: relative;
+  min-height: 680px;
 }
 
 #map {
   min-height: 680px;
+  height: 100%;
   background: var(--soft);
   border: 1px solid var(--line);
   border-radius: 18px;
   overflow: hidden;
+}
+
+.legend {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 500;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  width: 180px;
+  box-shadow: 0 8px 30px rgba(0, 56, 101, 0.12);
+}
+
+.legend strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.legend-scale {
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(210,242,240), rgb(25,82,145));
+}
+
+.legend-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.empty-state {
+  position: absolute;
+  inset: 16px;
+  z-index: 600;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .panel {
@@ -186,6 +260,13 @@ select, input[type="date"], input[type="text"] {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.detail-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #f7fbfc;
 }
 
 h2 {
@@ -258,6 +339,18 @@ textarea {
   color: var(--ink);
 }
 
+.about-card {
+  margin-top: 24px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.about-card summary {
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
 footer {
   color: var(--muted);
   font-size: 13px;
@@ -268,5 +361,5 @@ footer {
   .hero, .dashboard, .lookup-card { grid-template-columns: 1fr; }
   .hero-side, .controls, .lookup-controls { justify-content: start; justify-items: start; }
   .cards { grid-template-columns: repeat(2, 1fr); }
-  #map { min-height: 520px; }
+  #map, .map-wrap { min-height: 520px; }
 }
