@@ -20,6 +20,10 @@ def normalise(value: Any) -> str:
     return str(value or "").strip().upper()
 
 
+def normalise_postcode(value: Any) -> str:
+    return " ".join(str(value or "").strip().upper().split())
+
+
 def iso_z(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -34,7 +38,7 @@ def parse_iso(value: str) -> datetime | None:
 
 
 def postcode_to_sector(postcode: str) -> str:
-    postcode = " ".join(str(postcode or "").strip().upper().split())
+    postcode = normalise_postcode(postcode)
     parts = postcode.split(" ")
     if len(parts) != 2 or not parts[1]:
         return ""
@@ -109,11 +113,12 @@ def fetch_rolling_events(cutoff: datetime) -> list[dict[str, Any]]:
     grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     for row in rows:
-        sector = postcode_to_sector(row["postcode"])
+        postcode = normalise_postcode(row["postcode"])
+        sector = postcode_to_sector(postcode)
         network = normalise(row["network"])
         outage_id = str(row["outage_id"] or "")
 
-        if not sector or not outage_id or network not in VALID_NETWORKS:
+        if not postcode or not sector or not outage_id or network not in VALID_NETWORKS:
             continue
 
         key = (sector, network, outage_id)
@@ -125,6 +130,7 @@ def fetch_rolling_events(cutoff: datetime) -> list[dict[str, Any]]:
                 "postcode_sector": sector,
                 "network": network,
                 "outage_id": outage_id,
+                "postcodes_set": set(),
                 "outage_type_set": set(),
                 "customers_affected": 0.0,
                 "first_seen": first_seen,
@@ -132,6 +138,7 @@ def fetch_rolling_events(cutoff: datetime) -> list[dict[str, Any]]:
             }
 
         item = grouped[key]
+        item["postcodes_set"].add(postcode)
         item["customers_affected"] = max(item["customers_affected"], to_number(row["customers_affected"]))
 
         if first_seen and (not item["first_seen"] or first_seen < item["first_seen"]):
@@ -158,6 +165,7 @@ def fetch_rolling_events(cutoff: datetime) -> list[dict[str, Any]]:
                 "postcode_sector": value["postcode_sector"],
                 "network": value["network"],
                 "outage_id": value["outage_id"],
+                "postcodes": sorted(value["postcodes_set"]),
                 "outage_type": ",".join(sorted(value["outage_type_set"])),
                 "outage_count": 1,
                 "total_customers_affected": round(value["customers_affected"], 2),
