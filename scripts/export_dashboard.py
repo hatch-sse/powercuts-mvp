@@ -1,23 +1,44 @@
 from __future__ import annotations
 
-import csv
 import json
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
-EXPORTS = ROOT / "data" / "exports"
-SECTORS = EXPORTS / "sectors"
-DASHBOARD_DATA = ROOT / "docs" / "data"
+from db import get_connection, init_db
 
+ROOT = Path(__file__).resolve().parents[1]
+DASHBOARD_DATA = ROOT / "docs" / "data"
 SECTOR_BOUNDARIES_GEOJSON = ROOT / "data" / "mapping" / "ssen-postcode-sector-boundaries.geojson"
 
 VALID_NETWORKS = {"SHEPD", "SEPD"}
+ROLLING_DAYS = 365
 
 
 def normalise(value: Any) -> str:
     return str(value or "").strip().upper()
+
+
+def iso_z(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_iso(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def postcode_to_sector(postcode: str) -> str:
+    postcode = " ".join(str(postcode or "").strip().upper().split())
+    parts = postcode.split(" ")
+    if len(parts) != 2 or not parts[1]:
+        return ""
+    return f"{parts[0]} {parts[1][0]}"
 
 
 def to_number(value: Any) -> float:
@@ -27,15 +48,6 @@ def to_number(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
-
-def read_csv(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        print(f"Missing {path}, skipping")
-        return []
-
-    with path.open("r", newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
 
 
 def read_sector_boundaries() -> dict[str, dict[str, Any]]:
@@ -59,18 +71,12 @@ def read_sector_boundaries() -> dict[str, dict[str, Any]]:
         boundary_network = normalise(props.get("network"))
         geometry = feature.get("geometry")
 
-        if not sector:
-            continue
-
-        if boundary_network not in VALID_NETWORKS:
-            continue
-
-        if not geometry:
+        if not sector or boundary_network not in VALID_NETWORKS or not geometry:
             continue
 
         boundaries[sector] = {
             "postcode_sector": sector,
-            "boundary_network": boundary_network,
+            "network": boundary_network,
             "geometry": geometry,
         }
 
@@ -81,115 +87,157 @@ def read_sector_boundaries() -> dict[str, dict[str, Any]]:
     return boundaries
 
 
-def filter_valid_sector_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    valid_rows: list[dict[str, Any]] = []
+def fetch_rolling_events(cutoff: datetime) -> list[dict[str, Any]]:
+    query = """
+        SELECT
+            op.postcode AS postcode,
+            op.outage_id AS outage_id,
+            COALESCE(o.network, '') AS network,
+            COALESCE(o.outage_type, '') AS outage_type,
+            COALESCE(o.customers_affected, 0) AS customers_affected,
+            op.first_seen_utc AS first_seen_utc,
+            op.last_seen_utc AS last_seen_utc
+        FROM outage_postcodes op
+        JOIN outages o
+          ON o.outage_id = op.outage_id
+        WHERE op.last_seen_utc >= ?
+    """
+
+    with get_connection() as conn:
+        rows = conn.execute(query, (iso_z(cutoff),)).fetchall()
+
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     for row in rows:
-        network = normalise(row.get("network"))
-        sector = normalise(row.get("postcode_sector"))
+        sector = postcode_to_sector(row["postcode"])
+        network = normalise(row["network"])
+        outage_id = str(row["outage_id"] or "")
 
-        if network not in VALID_NETWORKS:
+        if not sector or not outage_id or network not in VALID_NETWORKS:
             continue
 
-        if not sector:
-            continue
+        key = (sector, network, outage_id)
+        first_seen = str(row["first_seen_utc"] or "")
+        last_seen = str(row["last_seen_utc"] or "")
 
-        row = dict(row)
-        row["network"] = network
-        row["postcode_sector"] = sector
-        valid_rows.append(row)
+        if key not in grouped:
+            grouped[key] = {
+                "postcode_sector": sector,
+                "network": network,
+                "outage_id": outage_id,
+                "outage_type_set": set(),
+                "customers_affected": 0.0,
+                "first_seen": first_seen,
+                "last_seen": last_seen,
+            }
 
-    return valid_rows
+        item = grouped[key]
+        item["customers_affected"] = max(item["customers_affected"], to_number(row["customers_affected"]))
+
+        if first_seen and (not item["first_seen"] or first_seen < item["first_seen"]):
+            item["first_seen"] = first_seen
+
+        if last_seen and (not item["last_seen"] or last_seen > item["last_seen"]):
+            item["last_seen"] = last_seen
+
+        outage_type = normalise(row["outage_type"])
+        if outage_type:
+            item["outage_type_set"].add(outage_type)
+
+    events: list[dict[str, Any]] = []
+
+    for value in grouped.values():
+        first_dt = parse_iso(value["first_seen"])
+        last_dt = parse_iso(value["last_seen"])
+        duration_hours = 0.0
+        if first_dt and last_dt and last_dt >= first_dt:
+            duration_hours = round((last_dt - first_dt).total_seconds() / 3600, 2)
+
+        events.append(
+            {
+                "postcode_sector": value["postcode_sector"],
+                "network": value["network"],
+                "outage_id": value["outage_id"],
+                "outage_type": ",".join(sorted(value["outage_type_set"])),
+                "outage_count": 1,
+                "total_customers_affected": round(value["customers_affected"], 2),
+                "first_seen": value["first_seen"],
+                "last_seen": value["last_seen"],
+                "time_off_supply_hours_total_approx": duration_hours,
+            }
+        )
+
+    events.sort(key=lambda r: (r["last_seen"], r["postcode_sector"], r["outage_id"]))
+    return events
 
 
-def attach_boundaries(
-    sector_rows: list[dict[str, Any]],
-    boundaries: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
-    final_rows: list[dict[str, Any]] = []
+def filter_events_to_boundary(events: list[dict[str, Any]], boundaries: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
     skipped_missing_boundary = 0
     skipped_network_mismatch = 0
 
-    for row in sector_rows:
-        sector = normalise(row.get("postcode_sector"))
-        network = normalise(row.get("network"))
-
+    for event in events:
+        sector = event["postcode_sector"]
+        network = event["network"]
         boundary = boundaries.get(sector)
 
         if not boundary:
             skipped_missing_boundary += 1
             continue
 
-        # This is the important patch filter:
-        # keep the sector only if the sector boundary itself belongs to the same SSEN network.
-        if boundary["boundary_network"] != network:
+        if boundary["network"] != network:
             skipped_network_mismatch += 1
             continue
 
-        final_rows.append(
-            {
-                "postcode_sector": sector,
-                "network": network,
-                "outage_type": str(row.get("outage_type") or ""),
-                "outage_count": to_number(row.get("outage_count")),
-                "total_customers_affected": to_number(row.get("total_customers_affected")),
-                "time_off_supply_hours_total_approx": to_number(
-                    row.get("time_off_supply_hours_total_approx")
-                ),
-                "geometry": boundary["geometry"],
-            }
-        )
+        filtered.append(event)
 
-    print(f"Skipped {skipped_missing_boundary} sector rows with no SSEN boundary")
-    print(f"Skipped {skipped_network_mismatch} sector rows where network did not match boundary")
-
-    return final_rows
+    print(f"Skipped {skipped_missing_boundary} events with no SSEN boundary")
+    print(f"Skipped {skipped_network_mismatch} events where network did not match boundary")
+    return filtered
 
 
-def build_dashboard_file(label: str, sector_csv: Path, out_json: Path) -> None:
+def build_dashboard() -> None:
+    init_db()
+    DASHBOARD_DATA.mkdir(parents=True, exist_ok=True)
+
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    cutoff = now - timedelta(days=ROLLING_DAYS)
+
     boundaries = read_sector_boundaries()
-    sector_rows = filter_valid_sector_rows(read_csv(sector_csv))
-    sector_rows = attach_boundaries(sector_rows, boundaries)
+    events = fetch_rolling_events(cutoff)
+    events = filter_events_to_boundary(events, boundaries)
+
+    used_sectors = {event["postcode_sector"] for event in events}
+    boundary_rows = [boundaries[sector] for sector in sorted(used_sectors) if sector in boundaries]
+
+    available_first = min((event["first_seen"] for event in events if event.get("first_seen")), default=iso_z(cutoff))
+    available_last = max((event["last_seen"] for event in events if event.get("last_seen")), default=iso_z(now))
 
     payload = {
-        "label": label,
-        "generated_at": datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z"),
-        "source_sector_file": str(sector_csv.relative_to(ROOT)) if sector_csv.exists() else str(sector_csv),
+        "label": "Rolling 12 months",
+        "generated_at": iso_z(now),
+        "rolling_days": ROLLING_DAYS,
+        "available_start": available_first[:10],
+        "available_end": available_last[:10],
         "valid_networks": sorted(VALID_NETWORKS),
         "mapping_granularity": "postcode_sector",
         "notes": [
             "Dashboard is mapped at postcode sector level.",
             "Only sectors within the official SSEN SHEPD/SEPD licence areas are included.",
-            "Out-of-patch postcode sectors are excluded before the dashboard data is written.",
+            "Dashboard data is limited to a rolling 12-month window to keep the public site lightweight.",
             "Time off supply is approximate and based on captured outage windows.",
         ],
-        "sectors": sector_rows,
+        "boundaries": boundary_rows,
+        "events": events,
     }
 
-    out_json.parent.mkdir(parents=True, exist_ok=True)
+    out_json = DASHBOARD_DATA / "dashboard_rolling_12m.json"
     out_json.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
-
-    print(f"Wrote {out_json} with {len(sector_rows)} mapped sector rows")
+    print(f"Wrote {out_json} with {len(events)} events and {len(boundary_rows)} sector boundaries")
 
 
 def main() -> int:
-    DASHBOARD_DATA.mkdir(parents=True, exist_ok=True)
-
-    build_dashboard_file(
-        "Current year",
-        SECTORS / "postcode_sectors_current_year.csv",
-        DASHBOARD_DATA / "dashboard_current_year.json",
-    )
-
-    build_dashboard_file(
-        "Current month",
-        SECTORS / "postcode_sectors_current_month.csv",
-        DASHBOARD_DATA / "dashboard_current_month.json",
-    )
-
+    build_dashboard()
     return 0
 
 
