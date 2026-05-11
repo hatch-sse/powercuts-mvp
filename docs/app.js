@@ -285,27 +285,6 @@ function updateCards() {
   document.getElementById("timeCard").textContent = fmtHours(hours);
 }
 
-function updateSummaryInsight() {
-  const sectors = state.currentSectors;
-  const metric = selectedMetric();
-  const network = selectedNetwork() === "ALL" ? "all networks" : selectedNetwork();
-  const type = selectedOutageType() === "ALL" ? "all power cut types" : selectedOutageType();
-
-  if (!sectors.length) {
-    document.getElementById("summaryInsight").textContent = "No sectors match the current filters.";
-    return;
-  }
-
-  const top = sectors[0];
-  const metaCount = new Set(sectors.map((row) => row.postcode_sector)).size;
-  const totalOutages = sectors.reduce((sum, row) => sum + num(row.outage_count), 0);
-
-  document.getElementById("summaryInsight").textContent =
-    `For the selected period, ${network}, and ${type}, ${fmt(metaCount)} postcode sectors match the current filters. ` +
-    `The highest ${metricLabels[metric].toLowerCase()} value is in ${top.postcode_sector}. ` +
-    `The current view contains ${fmt(totalOutages)} recorded outages and ${fmt(metaCount)} sectors ready for Meta Ads.`;
-}
-
 function updateTable() {
   const metric = selectedMetric();
   const rows = state.currentSectors.filter((row) => num(row[metric]) > 0).slice(0, 20);
@@ -588,7 +567,6 @@ async function loadData() {
 function updateAll() {
   state.currentSectors = getFilteredSectors();
   updateCards();
-  updateSummaryInsight();
   updateTable();
   updateMap();
   updateMetaCount();
