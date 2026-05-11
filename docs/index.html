@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SSEN Power Interruption Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=17" />
+  <link rel="stylesheet" href="style.css?v=18" />
 </head>
 <body>
   <main class="shell">
@@ -22,7 +22,7 @@
           <article class="card"><strong id="sectorsCard">–</strong><span>Postcode sectors</span></article>
           <article class="card"><strong id="outagesCard">–</strong><span>Total outages</span></article>
           <article class="card"><strong id="customersCard">–</strong><span>Customers affected</span></article>
-          <article class="card"><strong id="timeCard">–</strong><span>Total time off supply</span></article>
+          <article class="card"><strong id="timeCard">–</strong><span>Total time off supply (hrs)</span></article>
         </section>
       </div>
     </header>
@@ -42,6 +42,13 @@
             <option value="SEPD">SEPD</option>
           </select>
         </label>
+        <div class="quick-ranges inline-ranges" aria-label="Quick date ranges">
+          <button class="secondary small" data-range="7">Last 7 days</button>
+          <button class="secondary small" data-range="30">Last 30 days</button>
+          <button class="secondary small" data-range="90">Last 90 days</button>
+          <button class="secondary small" data-range="ytd">Year to date</button>
+        </div>
+        <div class="filter-break" aria-hidden="true"></div>
         <label>Metric
           <select id="metricSelect">
             <option value="outage_count">Outages</option>
@@ -66,22 +73,6 @@
             <option value="PSI">PSI</option>
           </select>
         </label>
-        <div class="filter-break" aria-hidden="true"></div>
-        <label>Minimum outages
-          <input type="number" id="minOutages" min="0" step="1" value="0" />
-        </label>
-        <label>Minimum customers affected
-          <input type="number" id="minCustomers" min="0" step="1" value="0" />
-        </label>
-        <label>Minimum time off supply (hours)
-          <input type="number" id="minHours" min="0" step="0.5" value="0" />
-        </label>
-        <div class="quick-ranges inline-ranges" aria-label="Quick date ranges">
-          <button class="secondary small" data-range="7">Last 7 days</button>
-          <button class="secondary small" data-range="30">Last 30 days</button>
-          <button class="secondary small" data-range="90">Last 90 days</button>
-          <button class="secondary small" data-range="ytd">Year to date</button>
-        </div>
         <div class="filter-break" aria-hidden="true"></div>
         <div class="embedded-search">
           <div>
@@ -141,6 +132,6 @@
     </details>
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>
