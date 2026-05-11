@@ -168,7 +168,26 @@ footer { color: #aebfcb; font-size: 13px; margin-top: 18px; }
   .workspace { margin-top: 20px; padding: 14px; border-radius: 20px; }
   .filter-card { gap: 12px; }
   label { width: 100%; }
+  .filter-card > label:nth-of-type(1),
+  .filter-card > label:nth-of-type(2) {
+    width: calc(50% - 6px);
+  }
   select, input[type="date"], input[type="text"], input[type="number"] { width: 100%; min-width: 0; }
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 48px;
+    padding: 0 14px;
+    text-align: left;
+    font-size: 14px;
+    line-height: 48px;
+  }
+  input[type="date"]::-webkit-date-and-time-value {
+    text-align: left;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    margin-left: 4px;
+  }
   .quick-ranges { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .quick-ranges button { width: 100%; padding: 10px 8px; }
   .embedded-search { gap: 12px; }
