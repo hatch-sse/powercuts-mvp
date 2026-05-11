@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SSEN Power Cut Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
   <main class="shell">
@@ -14,6 +14,7 @@
         <p class="eyebrow">SSEN outage history</p>
         <h1>Power Cut Insights</h1>
         <p class="lede">Explore recent SSEN power cut history by postcode sector, filter by date range and network, and export Meta-ready targeting sectors.</p>
+        <p id="freshnessNote" class="freshness">Loading latest update…</p>
       </div>
       <div class="hero-side">
         <img class="ssen-logo" src="assets/ssen-logo-white.svg" alt="SSEN" />
@@ -35,7 +36,7 @@
             <select id="metricSelect">
               <option value="outage_count">Outages</option>
               <option value="total_customers_affected">Customers affected</option>
-              <option value="time_off_supply_hours_total_approx">Time off supply</option>
+              <option value="time_off_supply_hours_total_approx">Total time off supply</option>
             </select>
           </label>
         </div>
@@ -50,12 +51,38 @@
       <span id="dateRangeNote" class="note"></span>
     </section>
 
+    <section class="filter-card">
+      <label>Hotspot view
+        <select id="hotspotLimit">
+          <option value="ALL">Show all sectors</option>
+          <option value="10">Top 10</option>
+          <option value="25">Top 25</option>
+          <option value="50">Top 50</option>
+          <option value="100">Top 100</option>
+        </select>
+      </label>
+      <label>Minimum outages
+        <input type="number" id="minOutages" min="0" step="1" value="0" />
+      </label>
+      <label>Minimum customers affected
+        <input type="number" id="minCustomers" min="0" step="1" value="0" />
+      </label>
+      <label>Minimum time off supply hours
+        <input type="number" id="minHours" min="0" step="0.5" value="0" />
+      </label>
+    </section>
+
+    <section class="insight-card">
+      <h2>Summary insight</h2>
+      <p id="summaryInsight" class="note">Loading summary…</p>
+    </section>
+
     <section class="cards">
       <article class="card"><span>Mapped sectors</span><strong id="areasCard">–</strong></article>
       <article class="card"><span>Postcode sectors</span><strong id="sectorsCard">–</strong></article>
       <article class="card"><span>Total outages</span><strong id="outagesCard">–</strong></article>
       <article class="card"><span>Customers affected</span><strong id="customersCard">–</strong></article>
-      <article class="card"><span>Time off supply</span><strong id="timeCard">–</strong></article>
+      <article class="card"><span>Total time off supply</span><strong id="timeCard">–</strong></article>
     </section>
 
     <section class="lookup-card">
@@ -71,7 +98,15 @@
     </section>
 
     <section class="dashboard">
-      <div id="map"></div>
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div class="legend" aria-label="Map colour legend">
+          <strong id="legendTitle">Outages</strong>
+          <div class="legend-scale"></div>
+          <div class="legend-row"><span>Lower</span><span>Higher</span></div>
+        </div>
+        <div id="emptyState" class="empty-state" hidden></div>
+      </div>
       <aside class="panel">
         <h2>Top sectors</h2>
         <p id="metricNote" class="note"></p>
@@ -82,17 +117,30 @@
           </table>
         </div>
 
+        <section class="detail-card">
+          <h2>Selected sector</h2>
+          <div id="sectorDetail" class="note">Click a sector on the map to see more detail.</div>
+        </section>
+
         <h2>Meta export</h2>
-        <p class="note">Copies unique postcode sectors for the current date range and network filter.</p>
-        <button id="copyMetaBtn">Copy sectors for Meta</button>
+        <p id="metaCount" class="note">0 postcode sectors ready for Meta Ads.</p>
+        <button id="copyMetaBtn">Copy visible sectors for Meta</button>
         <button id="downloadMetaBtn" class="secondary">Download sectors</button>
+        <button id="downloadCsvBtn" class="secondary">Download current table as CSV</button>
         <textarea id="metaOutput" readonly placeholder="Postcode sectors will appear here after copying/exporting."></textarea>
       </aside>
     </section>
 
+    <details class="about-card">
+      <summary>About this data</summary>
+      <p>Data is based on captured SSEN power cut records and is designed for internal insight and campaign planning.</p>
+      <p>Mapping is at postcode sector level, not full-postcode boundary level. Only sectors within SSEN SHEPD/SEPD licence areas are included.</p>
+      <p>Total time off supply is approximate and based on captured outage windows. Meta Ads targeting exports use postcode sectors because that is the practical targeting geography supported by the workflow.</p>
+    </details>
+
     <footer><p id="sourceNote">Loading data…</p></footer>
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
