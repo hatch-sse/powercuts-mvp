@@ -1,11 +1,12 @@
 :root {
-  --bg: #f7f5ef;
+  --bg: #f4f8fb;
   --panel: #ffffff;
-  --ink: #17212b;
-  --muted: #647080;
-  --line: #e1ddd4;
-  --accent: #17212b;
-  --soft: #ece7dc;
+  --ink: #003865;
+  --muted: #5d6f7f;
+  --line: #d8e3ea;
+  --accent: #00a3ad;
+  --accent-dark: #003865;
+  --soft: #e8f2f5;
 }
 
 * { box-sizing: border-box; }
@@ -28,8 +29,10 @@ body {
   grid-template-columns: 1fr auto;
   gap: 24px;
   align-items: end;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--line);
+  padding: 26px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #003865, #006b7f);
+  color: white;
 }
 
 .eyebrow {
@@ -37,8 +40,8 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
+  color: #bdebf0;
+  font-weight: 800;
 }
 
 h1 {
@@ -50,7 +53,7 @@ h1 {
 
 .lede {
   max-width: 720px;
-  color: var(--muted);
+  color: #e6f7f9;
   font-size: 17px;
   line-height: 1.5;
 }
@@ -66,19 +69,27 @@ label {
   display: grid;
   gap: 6px;
   font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
+  color: inherit;
+  font-weight: 800;
 }
 
-select, button, textarea { font: inherit; }
+select, input, button, textarea { font: inherit; }
 
-select {
-  min-width: 170px;
+select, input[type="date"] {
+  min-width: 150px;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
   color: var(--ink);
+}
+
+.quick-ranges {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 18px 0 0;
 }
 
 .cards {
@@ -88,6 +99,8 @@ select {
   background: var(--line);
   border: 1px solid var(--line);
   margin: 24px 0;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .card {
@@ -121,11 +134,14 @@ select {
   min-height: 680px;
   background: var(--soft);
   border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
 }
 
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
+  border-radius: 18px;
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -148,6 +164,7 @@ h2 {
   max-height: 330px;
   overflow: auto;
   border: 1px solid var(--line);
+  border-radius: 12px;
 }
 
 table {
@@ -165,7 +182,7 @@ th, td {
 th {
   position: sticky;
   top: 0;
-  background: #fbfaf7;
+  background: #f7fbfc;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -174,16 +191,21 @@ th {
 button {
   border: 0;
   border-radius: 10px;
-  background: var(--accent);
+  background: var(--accent-dark);
   color: white;
   padding: 11px 14px;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 button.secondary {
-  background: #e8e3d8;
+  background: #d9f2f4;
   color: var(--ink);
+}
+
+button.small {
+  padding: 8px 11px;
+  font-size: 13px;
 }
 
 textarea {
