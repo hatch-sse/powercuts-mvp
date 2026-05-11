@@ -1,9 +1,11 @@
 const DATA_BASE = "data/";
+const DATA_FILE = "dashboard_rolling_12m.json";
 
 const state = {
   payload: null,
   map: null,
   layer: null,
+  boundaryBySector: new Map(),
 };
 
 const metricLabels = {
@@ -13,10 +15,10 @@ const metricLabels = {
 };
 
 const metricDescriptions = {
-  outage_count: "Colour shows total outage count by postcode sector.",
-  total_customers_affected: "Colour shows total customers affected by postcode sector.",
+  outage_count: "Colour shows distinct outage count by postcode sector for the selected date range.",
+  total_customers_affected: "Colour shows total customers affected by postcode sector for the selected date range.",
   time_off_supply_hours_total_approx:
-    "Colour shows approximate total time off supply in hours by postcode sector.",
+    "Colour shows approximate total time off supply in hours by postcode sector for the selected date range.",
 };
 
 function num(value) {
@@ -29,9 +31,7 @@ function fmt(value) {
 }
 
 function fmtHours(value) {
-  return num(value).toLocaleString("en-GB", {
-    maximumFractionDigits: 1,
-  });
+  return num(value).toLocaleString("en-GB", { maximumFractionDigits: 1 });
 }
 
 function selectedNetwork() {
@@ -42,16 +42,125 @@ function selectedMetric() {
   return document.getElementById("metricSelect").value;
 }
 
-function getFilteredSectors() {
-  const network = selectedNetwork();
-  const rows = state.payload?.sectors || [];
+function parseDateOnly(value) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+}
 
-  return rows.filter((row) => {
-    if (!row.postcode_sector) return false;
-    if (!row.geometry) return false;
-    if (network !== "ALL" && row.network !== network) return false;
-    return true;
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function toDateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function clampDate(date, minDate, maxDate) {
+  if (date < minDate) return minDate;
+  if (date > maxDate) return maxDate;
+  return date;
+}
+
+function eventOverlapsRange(event, startDate, endDateExclusive) {
+  const firstSeen = new Date(event.first_seen);
+  const lastSeen = new Date(event.last_seen);
+
+  if (Number.isNaN(firstSeen.getTime()) || Number.isNaN(lastSeen.getTime())) {
+    return false;
+  }
+
+  return firstSeen < endDateExclusive && lastSeen >= startDate;
+}
+
+function getDateRange() {
+  const minDate = parseDateOnly(state.payload?.available_start);
+  const maxDate = parseDateOnly(state.payload?.available_end);
+  let startDate = parseDateOnly(document.getElementById("startDate").value);
+  let endDate = parseDateOnly(document.getElementById("endDate").value);
+
+  if (!minDate || !maxDate) {
+    const today = new Date();
+    return {
+      startDate: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 30)),
+      endDate,
+      endDateExclusive: addDays(today, 1),
+    };
+  }
+
+  startDate = startDate || addDays(maxDate, -30);
+  endDate = endDate || maxDate;
+
+  startDate = clampDate(startDate, minDate, maxDate);
+  endDate = clampDate(endDate, minDate, maxDate);
+
+  if (startDate > endDate) {
+    const temp = startDate;
+    startDate = endDate;
+    endDate = temp;
+  }
+
+  return { startDate, endDate, endDateExclusive: addDays(endDate, 1) };
+}
+
+function getFilteredEvents() {
+  const network = selectedNetwork();
+  const events = state.payload?.events || [];
+  const { startDate, endDateExclusive } = getDateRange();
+
+  return events.filter((event) => {
+    if (!event.postcode_sector) return false;
+    if (!state.boundaryBySector.has(event.postcode_sector)) return false;
+    if (network !== "ALL" && event.network !== network) return false;
+    return eventOverlapsRange(event, startDate, endDateExclusive);
   });
+}
+
+function aggregateEventsToSectors(events) {
+  const grouped = new Map();
+
+  for (const event of events) {
+    const key = `${event.postcode_sector}|${event.network}`;
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        postcode_sector: event.postcode_sector,
+        network: event.network,
+        outage_type_set: new Set(),
+        outage_ids: new Set(),
+        total_customers_affected: 0,
+        time_off_supply_hours_total_approx: 0,
+        geometry: state.boundaryBySector.get(event.postcode_sector)?.geometry,
+      });
+    }
+
+    const row = grouped.get(key);
+    row.outage_ids.add(event.outage_id);
+    row.total_customers_affected += num(event.total_customers_affected);
+    row.time_off_supply_hours_total_approx += num(event.time_off_supply_hours_total_approx);
+
+    for (const part of String(event.outage_type || "").split(",")) {
+      const clean = part.trim();
+      if (clean) row.outage_type_set.add(clean);
+    }
+  }
+
+  return [...grouped.values()].map((row) => ({
+    postcode_sector: row.postcode_sector,
+    network: row.network,
+    outage_type: [...row.outage_type_set].sort().join(","),
+    outage_count: row.outage_ids.size,
+    total_customers_affected: row.total_customers_affected,
+    time_off_supply_hours_total_approx: row.time_off_supply_hours_total_approx,
+    geometry: row.geometry,
+  }));
+}
+
+function getFilteredSectors() {
+  return aggregateEventsToSectors(getFilteredEvents());
 }
 
 function colourFor(value, maxValue) {
@@ -68,28 +177,12 @@ function colourFor(value, maxValue) {
 
 function updateCards() {
   const sectors = getFilteredSectors();
+  const totalOutages = sectors.reduce((sum, row) => sum + num(row.outage_count), 0);
+  const customers = sectors.reduce((sum, row) => sum + num(row.total_customers_affected), 0);
+  const hours = sectors.reduce((sum, row) => sum + num(row.time_off_supply_hours_total_approx), 0);
 
-  const totalOutages = sectors.reduce(
-    (sum, row) => sum + num(row.outage_count),
-    0
-  );
-
-  const customers = sectors.reduce(
-    (sum, row) => sum + num(row.total_customers_affected),
-    0
-  );
-
-  const hours = sectors.reduce(
-    (sum, row) => sum + num(row.time_off_supply_hours_total_approx),
-    0
-  );
-
-  document.getElementById("areasCard").textContent =
-    sectors.length.toLocaleString("en-GB");
-
-  document.getElementById("sectorsCard").textContent =
-    new Set(sectors.map((row) => row.postcode_sector).filter(Boolean)).size.toLocaleString("en-GB");
-
+  document.getElementById("areasCard").textContent = sectors.length.toLocaleString("en-GB");
+  document.getElementById("sectorsCard").textContent = new Set(sectors.map((row) => row.postcode_sector).filter(Boolean)).size.toLocaleString("en-GB");
   document.getElementById("outagesCard").textContent = fmt(totalOutages);
   document.getElementById("customersCard").textContent = fmt(customers);
   document.getElementById("timeCard").textContent = fmtHours(hours);
@@ -97,7 +190,6 @@ function updateCards() {
 
 function updateTable() {
   const metric = selectedMetric();
-
   const rows = getFilteredSectors()
     .filter((row) => num(row[metric]) > 0)
     .sort((a, b) => num(b[metric]) - num(a[metric]))
@@ -111,37 +203,26 @@ function updateTable() {
 
   for (const row of rows) {
     const tr = document.createElement("tr");
-
     tr.innerHTML = `
       <td>${row.postcode_sector}</td>
       <td>${row.network || "–"}</td>
-      <td>${
-        metric === "time_off_supply_hours_total_approx"
-          ? fmtHours(row[metric])
-          : fmt(row[metric])
-      }</td>
+      <td>${metric === "time_off_supply_hours_total_approx" ? fmtHours(row[metric]) : fmt(row[metric])}</td>
     `;
-
     tbody.appendChild(tr);
   }
 }
 
 function updateMap() {
   const metric = selectedMetric();
-  const sectors = getFilteredSectors().filter((row) => num(row[metric]) > 0);
+  const sectors = getFilteredSectors().filter((row) => num(row[metric]) > 0 && row.geometry);
   const maxValue = Math.max(...sectors.map((row) => num(row[metric])), 0);
 
-  if (state.layer) {
-    state.layer.remove();
-  }
+  if (state.layer) state.layer.remove();
 
   const group = L.featureGroup();
-  let drawnCount = 0;
 
   for (const row of sectors) {
-    const value = num(row[metric]);
-    const colour = colourFor(value, maxValue);
-
+    const colour = colourFor(row[metric], maxValue);
     const feature = {
       type: "Feature",
       properties: {
@@ -175,19 +256,13 @@ function updateMap() {
     });
 
     layer.addTo(group);
-    drawnCount += 1;
   }
 
   group.addTo(state.map);
   state.layer = group;
 
-  console.log(`Drawn sector polygons: ${drawnCount}`);
-
-  if (drawnCount > 0) {
-    state.map.fitBounds(group.getBounds(), {
-      padding: [30, 30],
-      maxZoom: 9,
-    });
+  if (sectors.length > 0) {
+    state.map.fitBounds(group.getBounds(), { padding: [30, 30], maxZoom: 9 });
   }
 }
 
@@ -195,7 +270,6 @@ function buildMetaList() {
   const sectors = getFilteredSectors()
     .map((row) => (row.postcode_sector || "").trim().toUpperCase())
     .filter(Boolean);
-
   return [...new Set(sectors)].sort().join(", ");
 }
 
@@ -218,34 +292,68 @@ function downloadMetaList() {
   const text = buildMetaList();
   document.getElementById("metaOutput").value = text;
 
-  const blob = new Blob([text], {
-    type: "text/plain;charset=utf-8",
-  });
-
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
 
   a.href = url;
   a.download = "meta-postcode-sectors.txt";
-
   document.body.appendChild(a);
   a.click();
   a.remove();
-
   URL.revokeObjectURL(url);
 }
 
-async function loadData() {
-  const file = document.getElementById("periodSelect").value;
-  const response = await fetch(DATA_BASE + file, {
-    cache: "no-store",
-  });
+function setQuickRange(range) {
+  const minDate = parseDateOnly(state.payload?.available_start);
+  const maxDate = parseDateOnly(state.payload?.available_end);
+  if (!minDate || !maxDate) return;
 
-  if (!response.ok) {
-    throw new Error(`Failed to load ${file}`);
+  let startDate;
+  const endDate = maxDate;
+
+  if (range === "ytd") {
+    startDate = new Date(Date.UTC(endDate.getUTCFullYear(), 0, 1));
+  } else {
+    startDate = addDays(endDate, -Number(range) + 1);
   }
 
+  startDate = clampDate(startDate, minDate, maxDate);
+  document.getElementById("startDate").value = toDateInputValue(startDate);
+  document.getElementById("endDate").value = toDateInputValue(endDate);
+  updateAll();
+}
+
+function initialiseDateInputs() {
+  const minDate = parseDateOnly(state.payload?.available_start);
+  const maxDate = parseDateOnly(state.payload?.available_end);
+  if (!minDate || !maxDate) return;
+
+  const startInput = document.getElementById("startDate");
+  const endInput = document.getElementById("endDate");
+
+  startInput.min = toDateInputValue(minDate);
+  startInput.max = toDateInputValue(maxDate);
+  endInput.min = toDateInputValue(minDate);
+  endInput.max = toDateInputValue(maxDate);
+
+  startInput.value = toDateInputValue(clampDate(addDays(maxDate, -29), minDate, maxDate));
+  endInput.value = toDateInputValue(maxDate);
+
+  document.getElementById("dateRangeNote").textContent =
+    `Available data: ${toDateInputValue(minDate)} to ${toDateInputValue(maxDate)}. Date filtering is limited to the rolling ${state.payload.rolling_days || 365} days.`;
+}
+
+async function loadData() {
+  const response = await fetch(DATA_BASE + DATA_FILE, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Failed to load ${DATA_FILE}`);
+
   state.payload = await response.json();
+  state.boundaryBySector = new Map(
+    (state.payload.boundaries || []).map((boundary) => [boundary.postcode_sector, boundary])
+  );
+
+  initialiseDateInputs();
 
   document.getElementById("sourceNote").textContent =
     `${state.payload.label}. Dashboard is mapped at postcode sector level. ` +
@@ -262,10 +370,7 @@ function updateAll() {
 }
 
 function initMap() {
-  state.map = L.map("map", {
-    zoomControl: true,
-  }).setView([55.4, -3.2], 6);
-
+  state.map = L.map("map", { zoomControl: true }).setView([55.4, -3.2], 6);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 12,
     attribution: "&copy; OpenStreetMap contributors",
@@ -275,11 +380,16 @@ function initMap() {
 document.addEventListener("DOMContentLoaded", async () => {
   initMap();
 
-  document.getElementById("periodSelect").addEventListener("change", loadData);
+  document.getElementById("startDate").addEventListener("change", updateAll);
+  document.getElementById("endDate").addEventListener("change", updateAll);
   document.getElementById("networkSelect").addEventListener("change", updateAll);
   document.getElementById("metricSelect").addEventListener("change", updateAll);
   document.getElementById("copyMetaBtn").addEventListener("click", copyMetaList);
   document.getElementById("downloadMetaBtn").addEventListener("click", downloadMetaList);
+
+  document.querySelectorAll("[data-range]").forEach((button) => {
+    button.addEventListener("click", () => setQuickRange(button.dataset.range));
+  });
 
   await loadData();
 });
