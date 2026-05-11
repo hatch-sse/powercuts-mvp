@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+from shapely.geometry import mapping, shape
+from shapely.ops import unary_union
 
 from db import get_connection, init_db
 
@@ -14,6 +16,7 @@ SECTOR_BOUNDARIES_GEOJSON = ROOT / "data" / "mapping" / "ssen-postcode-sector-bo
 
 VALID_NETWORKS = {"SHEPD", "SEPD"}
 ROLLING_DAYS = 365
+BOUNDARY_SIMPLIFY_TOLERANCE = 0.003
 
 
 def normalise(value: Any) -> str:
@@ -89,6 +92,42 @@ def read_sector_boundaries() -> dict[str, dict[str, Any]]:
 
     print(f"Loaded {len(boundaries)} SSEN postcode sector boundaries")
     return boundaries
+
+
+def build_licence_boundary_overlay(boundaries: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    overlays: list[dict[str, Any]] = []
+
+    for network in sorted(VALID_NETWORKS):
+        geoms = []
+        for boundary in boundaries.values():
+            if boundary["network"] != network:
+                continue
+            try:
+                geom = shape(boundary["geometry"])
+            except Exception:
+                continue
+            if not geom.is_empty:
+                geoms.append(geom)
+
+        if not geoms:
+            continue
+
+        unioned = unary_union(geoms)
+        outline = unioned.boundary.simplify(BOUNDARY_SIMPLIFY_TOLERANCE, preserve_topology=True)
+
+        overlays.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "network": network,
+                    "label": f"{network} licence area boundary",
+                },
+                "geometry": mapping(outline),
+            }
+        )
+
+    print(f"Built {len(overlays)} licence boundary overlays")
+    return overlays
 
 
 def fetch_rolling_events(cutoff: datetime) -> list[dict[str, Any]]:
@@ -212,6 +251,7 @@ def build_dashboard() -> None:
     cutoff = now - timedelta(days=ROLLING_DAYS)
 
     boundaries = read_sector_boundaries()
+    licence_boundaries = build_licence_boundary_overlay(boundaries)
     events = fetch_rolling_events(cutoff)
     events = filter_events_to_boundary(events, boundaries)
 
@@ -234,8 +274,10 @@ def build_dashboard() -> None:
             "Only sectors within the official SSEN SHEPD/SEPD licence areas are included.",
             "Dashboard data is limited to a rolling 12-month window to keep the public site lightweight.",
             "Time off supply is approximate and based on captured outage windows.",
+            "Licence boundary overlay is generated from the SSEN postcode sector boundary file.",
         ],
         "boundaries": boundary_rows,
+        "licence_boundaries": licence_boundaries,
         "events": events,
     }
 
