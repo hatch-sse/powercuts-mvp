@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,9 +13,9 @@ SECTORS = EXPORTS / "sectors"
 DASHBOARD_DATA = ROOT / "docs" / "data"
 
 MAPPING_XLSX = ROOT / "data" / "mapping" / "postcode-boundaries.xlsx"
+LICENCE_GEOJSON = ROOT / "data" / "mapping" / "ssen-licence-areas.geojson"
 
 VALID_NETWORKS = {"SHEPD", "SEPD"}
-ROLLING_DAYS = 365
 
 
 def normalise(value: Any) -> str:
@@ -66,7 +66,7 @@ def read_mapping_rows() -> list[dict[str, Any]]:
     df = pd.read_excel(MAPPING_XLSX, engine="openpyxl")
     df.columns = [str(c).strip() for c in df.columns]
 
-    required = {"postcode_area", "geometry_wkt"}
+    required = {"postcode_area", "geometry_wkt", "centroid_lat", "centroid_lon"}
     missing = required - set(df.columns)
     if missing:
         raise RuntimeError(f"Mapping workbook missing required columns: {sorted(missing)}")
@@ -90,6 +90,138 @@ def read_mapping_rows() -> list[dict[str, Any]]:
     return rows
 
 
+def read_licence_features() -> list[dict[str, Any]]:
+    if not LICENCE_GEOJSON.exists():
+        raise RuntimeError(
+            f"Missing licence boundary file: {LICENCE_GEOJSON}. "
+            "Add ssen-licence-areas.geojson to data/mapping/."
+        )
+
+    data = json.loads(LICENCE_GEOJSON.read_text(encoding="utf-8"))
+    features = data.get("features", [])
+    if not isinstance(features, list):
+        raise RuntimeError("Licence GeoJSON does not contain a features array")
+
+    valid_features: list[dict[str, Any]] = []
+    for feature in features:
+        props = feature.get("properties", {})
+        licence = normalise(props.get("licence_area"))
+
+        if licence not in VALID_NETWORKS:
+            continue
+
+        geometry = feature.get("geometry", {})
+        if not geometry:
+            continue
+
+        valid_features.append(
+            {
+                "licence_area": licence,
+                "geometry": geometry,
+            }
+        )
+
+    if not valid_features:
+        raise RuntimeError("No SHEPD or SEPD features found in licence GeoJSON")
+
+    return valid_features
+
+
+def point_in_ring(lon: float, lat: float, ring: list[list[float]]) -> bool:
+    """
+    Ray-casting point-in-polygon test.
+    Coordinates are expected as [lon, lat].
+    """
+    inside = False
+    j = len(ring) - 1
+
+    for i in range(len(ring)):
+        xi, yi = ring[i][0], ring[i][1]
+        xj, yj = ring[j][0], ring[j][1]
+
+        intersects = ((yi > lat) != (yj > lat)) and (
+            lon < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi
+        )
+
+        if intersects:
+            inside = not inside
+
+        j = i
+
+    return inside
+
+
+def point_in_polygon(lon: float, lat: float, polygon: list[Any]) -> bool:
+    """
+    Polygon coordinates are [outer_ring, hole1, hole2...].
+    Point must be inside outer ring and not inside holes.
+    """
+    if not polygon:
+        return False
+
+    outer = polygon[0]
+    if not point_in_ring(lon, lat, outer):
+        return False
+
+    for hole in polygon[1:]:
+        if point_in_ring(lon, lat, hole):
+            return False
+
+    return True
+
+
+def point_in_geometry(lon: float, lat: float, geometry: dict[str, Any]) -> bool:
+    geom_type = geometry.get("type")
+    coords = geometry.get("coordinates")
+
+    if geom_type == "Polygon":
+        return point_in_polygon(lon, lat, coords)
+
+    if geom_type == "MultiPolygon":
+        return any(point_in_polygon(lon, lat, polygon) for polygon in coords)
+
+    return False
+
+
+def licence_for_point(
+    lon: float | None,
+    lat: float | None,
+    licence_features: list[dict[str, Any]],
+) -> str:
+    if lon is None or lat is None:
+        return ""
+
+    for feature in licence_features:
+        if point_in_geometry(lon, lat, feature["geometry"]):
+            return feature["licence_area"]
+
+    return ""
+
+
+def filter_mapping_to_ssen_patch(
+    mapping_rows: list[dict[str, Any]],
+    licence_features: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
+
+    for row in mapping_rows:
+        licence = licence_for_point(
+            row.get("centroid_lon"),
+            row.get("centroid_lat"),
+            licence_features,
+        )
+
+        if licence not in VALID_NETWORKS:
+            continue
+
+        row = dict(row)
+        row["licence_area_from_boundary"] = licence
+        filtered.append(row)
+
+    print(f"Filtered mapping rows from {len(mapping_rows)} to {len(filtered)} inside SSEN licence areas")
+    return filtered
+
+
 def filter_valid_sector_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     valid_rows: list[dict[str, Any]] = []
 
@@ -103,6 +235,9 @@ def filter_valid_sector_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
         if not sector:
             continue
 
+        row = dict(row)
+        row["network"] = network
+        row["postcode_sector"] = sector
         valid_rows.append(row)
 
     return valid_rows
@@ -136,6 +271,12 @@ def aggregate_to_mapping(
         if not area:
             continue
 
+        # Critical SSEN patch rule:
+        # if the area is not inside the official SSEN licence boundary, drop it.
+        mapping = mapping_by_code.get(area)
+        if not mapping:
+            continue
+
         key = (area, network)
 
         if key not in grouped:
@@ -166,7 +307,6 @@ def aggregate_to_mapping(
     for value in grouped.values():
         mapping = mapping_by_code.get(value["postcode_area"], {})
 
-        # Only include areas that actually have SSEN outage data.
         if value["outage_count"] <= 0:
             continue
 
@@ -174,6 +314,7 @@ def aggregate_to_mapping(
             {
                 "postcode_area": value["postcode_area"],
                 "network": value["network"],
+                "licence_area_from_boundary": mapping.get("licence_area_from_boundary", ""),
                 "outage_type": ",".join(sorted(value["outage_type_set"])),
                 "outage_count": round(value["outage_count"], 2),
                 "total_customers_affected": round(value["total_customers_affected"], 2),
@@ -191,7 +332,10 @@ def aggregate_to_mapping(
 
 
 def build_dashboard_file(label: str, sector_csv: Path, out_json: Path) -> None:
+    licence_features = read_licence_features()
     mapping_rows = read_mapping_rows()
+    mapping_rows = filter_mapping_to_ssen_patch(mapping_rows, licence_features)
+
     sector_rows = filter_valid_sector_rows(read_csv(sector_csv))
     area_rows = aggregate_to_mapping(sector_rows, mapping_rows)
 
@@ -203,6 +347,7 @@ def build_dashboard_file(label: str, sector_csv: Path, out_json: Path) -> None:
         "mapping_granularity": "postcode_area",
         "notes": [
             "Only SHEPD and SEPD rows are included.",
+            "Postcode areas outside the official SSEN SHEPD/SEPD licence boundary are excluded.",
             "Outage sector data is aggregated to the geography supported by the mapping workbook.",
             "Time off supply is approximate and based on captured first/last seen outage windows.",
         ],
