@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SSEN Power Interruption Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=13" />
+  <link rel="stylesheet" href="style.css?v=14" />
 </head>
 <body>
   <main class="shell">
@@ -84,19 +84,19 @@
         <button class="secondary small" data-range="90">Last 90 days</button>
         <button class="secondary small" data-range="ytd">Year to date</button>
       </div>
+      <div class="filter-break" aria-hidden="true"></div>
+      <div class="embedded-search">
+        <div>
+          <h2>Search</h2>
+          <p class="note">Search by full postcode, partial postcode, postcode sector, or power cut reference such as TC9063.</p>
+        </div>
+        <div class="lookup-controls">
+          <input id="postcodeSearch" type="text" placeholder="e.g. AB31 4AA, AB31, or TC9063" autocomplete="postal-code" />
+          <button id="postcodeSearchBtn">Search</button>
+        </div>
+        <div id="postcodeResult" class="lookup-result note" hidden></div>
+      </div>
       <p id="dateRangeNote" class="note filter-note"></p>
-    </section>
-
-    <section class="lookup-card">
-      <div>
-        <h2>Search</h2>
-        <p class="note">Search by full postcode, partial postcode, postcode sector, or power cut reference such as TC9063.</p>
-      </div>
-      <div class="lookup-controls">
-        <input id="postcodeSearch" type="text" placeholder="e.g. AB31 4AA, AB31, or TC9063" autocomplete="postal-code" />
-        <button id="postcodeSearchBtn">Search</button>
-      </div>
-      <div id="postcodeResult" class="lookup-result note" hidden></div>
     </section>
 
     <section class="dashboard">
