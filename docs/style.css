@@ -337,6 +337,14 @@ th {
   letter-spacing: 0.08em;
 }
 
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover {
+  background: #e8f2f5;
+}
+
 button {
   border: 0;
   border-radius: 10px;
