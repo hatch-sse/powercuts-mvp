@@ -7,6 +7,7 @@ const state = {
   layer: null,
   licenceLayer: null,
   boundaryBySector: new Map(),
+  sectorLayerByKey: new Map(),
   currentSectors: [],
 };
 
@@ -54,6 +55,23 @@ function selectedOutageType() {
 
 function thresholdValue(id) {
   return num(document.getElementById(id)?.value || 0);
+}
+
+function sectorKey(row) {
+  return `${row.postcode_sector || ""}|${row.network || ""}`;
+}
+
+function showSearchResult() {
+  const result = document.getElementById("postcodeResult");
+  if (result) result.hidden = false;
+}
+
+function hideSearchResult() {
+  const result = document.getElementById("postcodeResult");
+  if (result) {
+    result.hidden = true;
+    result.innerHTML = "";
+  }
 }
 
 function normalisePostcode(value) {
@@ -282,7 +300,15 @@ function updateCards() {
   document.getElementById("sectorsCard").textContent = new Set(sectors.map((row) => row.postcode_sector).filter(Boolean)).size.toLocaleString("en-GB");
   document.getElementById("outagesCard").textContent = fmt(totalOutages);
   document.getElementById("customersCard").textContent = fmt(customers);
-  document.getElementById("timeCard").textContent = fmtHours(hours);
+  document.getElementById("timeCard").textContent = `${fmtHours(hours)} hours`;
+}
+
+function selectSector(row) {
+  showSectorDetail(row);
+  const layer = state.sectorLayerByKey.get(sectorKey(row));
+  if (!layer) return;
+  state.map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 10 });
+  layer.openPopup();
 }
 
 function updateTable() {
@@ -298,11 +324,14 @@ function updateTable() {
 
   for (const row of rows) {
     const tr = document.createElement("tr");
+    tr.className = "clickable-row";
+    tr.title = `Zoom to ${row.postcode_sector}`;
     tr.innerHTML = `
       <td>${row.postcode_sector}</td>
       <td>${row.network || "–"}</td>
       <td>${metric === "time_off_supply_hours_total_approx" ? fmtHours(row[metric]) : fmt(row[metric])}</td>
     `;
+    tr.addEventListener("click", () => selectSector(row));
     tbody.appendChild(tr);
   }
 }
@@ -372,6 +401,7 @@ function updateMap() {
   const maxValue = Math.max(...sectors.map((row) => num(row[metric])), 0);
 
   if (state.layer) state.layer.remove();
+  state.sectorLayerByKey = new Map();
   const group = L.featureGroup();
 
   for (const row of sectors) {
@@ -385,6 +415,7 @@ function updateMap() {
         leafletLayer.bindPopup(`<strong>${row.postcode_sector}</strong><br/>${metricLabels[metric]}: ${metric === "time_off_supply_hours_total_approx" ? fmtHours(row[metric]) : fmt(row[metric])}`);
       },
     });
+    state.sectorLayerByKey.set(sectorKey(row), layer);
     layer.addTo(group);
   }
 
@@ -488,9 +519,11 @@ function handleSearch() {
   const q = compact(raw);
 
   if (!q) {
-    result.innerHTML = "Enter a postcode or reference to search the selected date range.";
+    hideSearchResult();
     return;
   }
+
+  showSearchResult();
 
   const events = getFilteredEvents();
   const matchedEvents = events.filter((event) => eventMatchesSearch(event, raw));
