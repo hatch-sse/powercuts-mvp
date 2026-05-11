@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SSEN Power Cut Insights</title>
+  <title>SSEN Power Interruption Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="style.css?v=8" />
 </head>
 <body>
   <main class="shell">
     <header class="hero">
       <div>
         <p class="eyebrow">SSEN outage history</p>
-        <h1>Power Cut Insights</h1>
-        <p class="lede">Explore recent SSEN power cut history by postcode sector, filter by date range and network, and export Meta-ready targeting sectors.</p>
+        <h1>Power interruption insights</h1>
+        <p class="lede">Explore recent SSEN power interruption history by postcode sector, filter by date range and network, and export Meta-ready targeting sectors.</p>
         <p id="freshnessNote" class="freshness">Loading latest update…</p>
       </div>
       <div class="hero-side">
@@ -67,6 +67,7 @@
           <option value="PSI">PSI</option>
         </select>
       </label>
+      <div class="filter-break" aria-hidden="true"></div>
       <label>Minimum outages
         <input type="number" id="minOutages" min="0" step="1" value="0" />
       </label>
@@ -134,7 +135,7 @@
 
     <details class="about-card">
       <summary>About this data</summary>
-      <p>Data is based on captured SSEN power cut records and is designed for internal insight and campaign planning.</p>
+      <p>Data is based on captured SSEN power interruption records and is designed for internal insight and campaign planning.</p>
       <p>Mapping is at postcode sector level, not full-postcode boundary level. Only sectors within SSEN SHEPD/SEPD licence areas are included.</p>
       <p>Total time off supply is approximate and based on captured outage windows. Meta Ads targeting exports use postcode sectors because that is the practical targeting geography supported by the workflow.</p>
     </details>
