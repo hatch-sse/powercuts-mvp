@@ -303,12 +303,33 @@ function updateCards() {
   document.getElementById("timeCard").textContent = `${fmtHours(hours)} hours`;
 }
 
+function openLayerPopup(layer) {
+  let opened = false;
+
+  if (layer && typeof layer.eachLayer === "function") {
+    layer.eachLayer((childLayer) => {
+      if (!opened && typeof childLayer.openPopup === "function") {
+        childLayer.openPopup();
+        opened = true;
+      }
+    });
+  }
+
+  if (!opened && layer && typeof layer.openPopup === "function") {
+    layer.openPopup();
+  }
+}
+
 function selectSector(row) {
   showSectorDetail(row);
   const layer = state.sectorLayerByKey.get(sectorKey(row));
   if (!layer) return;
+
+  const openPopup = () => openLayerPopup(layer);
+  state.map.once("moveend", openPopup);
   state.map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 10 });
-  layer.openPopup();
+
+  window.setTimeout(openPopup, 650);
 }
 
 function updateTable() {
