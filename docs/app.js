@@ -5,6 +5,7 @@ const state = {
   payload: null,
   map: null,
   layer: null,
+  licenceLayer: null,
   boundaryBySector: new Map(),
   currentSectors: [],
 };
@@ -320,6 +321,34 @@ function updateEmptyState(sectors) {
   empty.textContent = `No outages found for ${selectedNetwork()} between ${formatDateUK(startDate)} and ${formatDateUK(endDate)}. Try widening the date range or lowering the thresholds.`;
 }
 
+function drawLicenceBoundary() {
+  if (state.licenceLayer) state.licenceLayer.remove();
+
+  const selected = selectedNetwork();
+  const features = (state.payload?.licence_boundaries || []).filter((feature) => {
+    const network = feature?.properties?.network;
+    return selected === "ALL" || network === selected;
+  });
+
+  if (!features.length) return;
+
+  state.licenceLayer = L.geoJSON(
+    { type: "FeatureCollection", features },
+    {
+      style: {
+        color: "#f28c28",
+        weight: 3,
+        opacity: 0.95,
+        fillOpacity: 0,
+        dashArray: "8 6",
+        interactive: false,
+      },
+    }
+  ).addTo(state.map);
+
+  state.licenceLayer.bringToFront();
+}
+
 function updateMap() {
   const metric = selectedMetric();
   const sectors = state.currentSectors.filter((row) => num(row[metric]) > 0 && row.geometry);
@@ -355,6 +384,7 @@ function updateMap() {
 
   group.addTo(state.map);
   state.layer = group;
+  drawLicenceBoundary();
   updateEmptyState(sectors);
 
   if (sectors.length > 0) {
@@ -529,7 +559,7 @@ async function loadData() {
   initialiseDateInputs();
 
   document.getElementById("freshnessNote").textContent = `Last updated: ${formatDateTimeUK(state.payload.generated_at)}`;
-  document.getElementById("sourceNote").textContent = `${state.payload.label}. Dashboard is mapped at postcode sector level. Only sectors within SSEN SHEPD/SEPD licence areas are included. Total time off supply is approximate.`;
+  document.getElementById("sourceNote").textContent = `${state.payload.label}. Dashboard is mapped at postcode sector level. Only sectors within SSEN SHEPD/SEPD licence areas are included. Orange dashed line shows the licence-area boundary generated from the postcode-sector boundary file. Total time off supply is approximate.`;
 
   updateAll();
 }
