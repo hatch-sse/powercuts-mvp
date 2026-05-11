@@ -59,49 +59,11 @@ function colourFor(value, maxValue) {
   const max = Math.log10(num(maxValue) + 1) || 1;
   const t = Math.max(0, Math.min(1, v / max));
 
-  // SSEN-style scale: pale cyan to deep navy
   const r = Math.round(210 - 185 * t);
   const g = Math.round(242 - 160 * t);
   const b = Math.round(240 - 95 * t);
 
   return `rgb(${r},${g},${b})`;
-}
-
-function geometryToLatLngs(geometry) {
-  if (!geometry || !geometry.coordinates) return [];
-
-  if (geometry.type === "Polygon") {
-    return geometry.coordinates.map((ring) =>
-      ring.map(([lon, lat]) => [lat, lon])
-    );
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    return geometry.coordinates.map((polygon) =>
-      polygon.map((ring) => ring.map(([lon, lat]) => [lat, lon]))
-    );
-  }
-
-  return [];
-}
-
-function createGeometryLayer(row, colour) {
-  const latLngs = geometryToLatLngs(row.geometry);
-
-  if (!latLngs.length) return null;
-
-  const options = {
-    color: "#003865",
-    weight: 0.8,
-    fillColor: colour,
-    fillOpacity: num(row[selectedMetric()]) > 0 ? 0.72 : 0.05,
-  };
-
-  if (row.geometry.type === "MultiPolygon") {
-    return L.multiPolygon(latLngs, options);
-  }
-
-  return L.polygon(latLngs, options);
 }
 
 function updateCards() {
@@ -179,25 +141,38 @@ function updateMap() {
   for (const row of sectors) {
     const value = num(row[metric]);
     const colour = colourFor(value, maxValue);
-    const layer = createGeometryLayer(row, colour);
 
-    if (!layer) continue;
+    const feature = {
+      type: "Feature",
+      properties: {
+        postcode_sector: row.postcode_sector,
+        network: row.network,
+        outage_type: row.outage_type,
+        outage_count: row.outage_count,
+        total_customers_affected: row.total_customers_affected,
+        time_off_supply_hours_total_approx: row.time_off_supply_hours_total_approx,
+      },
+      geometry: row.geometry,
+    };
 
-    layer.setStyle({
-      color: "#003865",
-      weight: 0.8,
-      fillColor: colour,
-      fillOpacity: 0.72,
+    const layer = L.geoJSON(feature, {
+      style: {
+        color: "#003865",
+        weight: 0.9,
+        fillColor: colour,
+        fillOpacity: 0.75,
+      },
+      onEachFeature: function (_, leafletLayer) {
+        leafletLayer.bindPopup(`
+          <strong>${row.postcode_sector}</strong><br/>
+          Network: ${row.network || "–"}<br/>
+          Outage type: ${row.outage_type || "–"}<br/>
+          Outages: ${fmt(row.outage_count)}<br/>
+          Customers affected: ${fmt(row.total_customers_affected)}<br/>
+          Time off supply: ${fmtHours(row.time_off_supply_hours_total_approx)} hrs
+        `);
+      },
     });
-
-    layer.bindPopup(`
-      <strong>${row.postcode_sector}</strong><br/>
-      Network: ${row.network || "–"}<br/>
-      Outage type: ${row.outage_type || "–"}<br/>
-      Outages: ${fmt(row.outage_count)}<br/>
-      Customers affected: ${fmt(row.total_customers_affected)}<br/>
-      Time off supply: ${fmtHours(row.time_off_supply_hours_total_approx)} hrs
-    `);
 
     layer.addTo(group);
     drawnCount += 1;
