@@ -48,6 +48,10 @@ function selectedHotspotLimit() {
   return document.getElementById("hotspotLimit")?.value || "ALL";
 }
 
+function selectedOutageType() {
+  return document.getElementById("outageTypeSelect")?.value || "ALL";
+}
+
 function thresholdValue(id) {
   return num(document.getElementById(id)?.value || 0);
 }
@@ -56,6 +60,10 @@ function normalisePostcode(value) {
   const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (compact.length <= 3) return compact;
   return `${compact.slice(0, -3)} ${compact.slice(-3)}`;
+}
+
+function compact(value) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
 function postcodeToSector(postcode) {
@@ -112,12 +120,18 @@ function clampDate(date, minDate, maxDate) {
 function eventOverlapsRange(event, startDate, endDateExclusive) {
   const firstSeen = new Date(event.first_seen);
   const lastSeen = new Date(event.last_seen);
-
-  if (Number.isNaN(firstSeen.getTime()) || Number.isNaN(lastSeen.getTime())) {
-    return false;
-  }
-
+  if (Number.isNaN(firstSeen.getTime()) || Number.isNaN(lastSeen.getTime())) return false;
   return firstSeen < endDateExclusive && lastSeen >= startDate;
+}
+
+function eventMatchesOutageType(event) {
+  const type = selectedOutageType();
+  if (type === "ALL") return true;
+  return String(event.outage_type || "")
+    .toUpperCase()
+    .split(",")
+    .map((part) => part.trim())
+    .includes(type);
 }
 
 function getDateRange() {
@@ -137,7 +151,6 @@ function getDateRange() {
 
   startDate = startDate || addDays(maxDate, -30);
   endDate = endDate || maxDate;
-
   startDate = clampDate(startDate, minDate, maxDate);
   endDate = clampDate(endDate, minDate, maxDate);
 
@@ -159,6 +172,7 @@ function getFilteredEvents() {
     if (!event.postcode_sector) return false;
     if (!state.boundaryBySector.has(event.postcode_sector)) return false;
     if (network !== "ALL" && event.network !== network) return false;
+    if (!eventMatchesOutageType(event)) return false;
     return eventOverlapsRange(event, startDate, endDateExclusive);
   });
 }
@@ -175,6 +189,7 @@ function aggregateEventsToSectors(events) {
         network: event.network,
         outage_type_set: new Set(),
         outage_ids: new Set(),
+        postcodes_set: new Set(),
         total_customers_affected: 0,
         time_off_supply_hours_total_approx: 0,
         first_seen: event.first_seen,
@@ -185,6 +200,7 @@ function aggregateEventsToSectors(events) {
 
     const row = grouped.get(key);
     row.outage_ids.add(event.outage_id);
+    for (const postcode of event.postcodes || []) row.postcodes_set.add(normalisePostcode(postcode));
     row.total_customers_affected += num(event.total_customers_affected);
     row.time_off_supply_hours_total_approx += num(event.time_off_supply_hours_total_approx);
     if (event.first_seen && (!row.first_seen || event.first_seen < row.first_seen)) row.first_seen = event.first_seen;
@@ -200,6 +216,8 @@ function aggregateEventsToSectors(events) {
     postcode_sector: row.postcode_sector,
     network: row.network,
     outage_type: [...row.outage_type_set].sort().join(","),
+    outage_refs: [...row.outage_ids].sort(),
+    full_postcodes: [...row.postcodes_set].sort(),
     outage_count: row.outage_ids.size,
     total_customers_affected: row.total_customers_affected,
     time_off_supply_hours_total_approx: row.time_off_supply_hours_total_approx,
@@ -230,12 +248,28 @@ function colourFor(value, maxValue) {
   const v = Math.log10(num(value) + 1);
   const max = Math.log10(num(maxValue) + 1) || 1;
   const t = Math.max(0, Math.min(1, v / max));
-
   const r = Math.round(210 - 185 * t);
   const g = Math.round(242 - 160 * t);
   const b = Math.round(240 - 95 * t);
-
   return `rgb(${r},${g},${b})`;
+}
+
+function truncateList(values, limit = 80) {
+  const list = [...new Set(values.filter(Boolean))].sort();
+  if (!list.length) return "–";
+  const shown = list.slice(0, limit).join(", ");
+  return list.length > limit ? `${shown}, … plus ${list.length - limit} more` : shown;
+}
+
+async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const old = button.textContent;
+    button.textContent = "Copied";
+    setTimeout(() => (button.textContent = old), 1500);
+  } catch {
+    button.textContent = "Copy failed";
+  }
 }
 
 function updateCards() {
@@ -255,6 +289,7 @@ function updateSummaryInsight() {
   const sectors = state.currentSectors;
   const metric = selectedMetric();
   const network = selectedNetwork() === "ALL" ? "all networks" : selectedNetwork();
+  const type = selectedOutageType() === "ALL" ? "all power cut types" : selectedOutageType();
 
   if (!sectors.length) {
     document.getElementById("summaryInsight").textContent = "No sectors match the current filters.";
@@ -266,16 +301,14 @@ function updateSummaryInsight() {
   const totalOutages = sectors.reduce((sum, row) => sum + num(row.outage_count), 0);
 
   document.getElementById("summaryInsight").textContent =
-    `For the selected period and ${network}, ${fmt(metaCount)} postcode sectors match the current filters. ` +
+    `For the selected period, ${network}, and ${type}, ${fmt(metaCount)} postcode sectors match the current filters. ` +
     `The highest ${metricLabels[metric].toLowerCase()} value is in ${top.postcode_sector}. ` +
     `The current view contains ${fmt(totalOutages)} recorded outages and ${fmt(metaCount)} sectors ready for Meta Ads.`;
 }
 
 function updateTable() {
   const metric = selectedMetric();
-  const rows = state.currentSectors
-    .filter((row) => num(row[metric]) > 0)
-    .slice(0, 20);
+  const rows = state.currentSectors.filter((row) => num(row[metric]) > 0).slice(0, 20);
 
   document.getElementById("metricHeader").textContent = metricLabels[metric];
   document.getElementById("metricNote").textContent = metricDescriptions[metric];
@@ -296,17 +329,28 @@ function updateTable() {
 }
 
 function showSectorDetail(row) {
+  const postcodes = row.full_postcodes || [];
+  const refs = row.outage_refs || [];
   document.getElementById("sectorDetail").innerHTML = `
     <strong>${row.postcode_sector}</strong><br/>
     Network: ${row.network || "–"}<br/>
-    Outage type: ${row.outage_type || "–"}<br/>
+    Power cut type: ${row.outage_type || "–"}<br/>
     Outages: ${fmt(row.outage_count)}<br/>
     Customers affected: ${fmt(row.total_customers_affected)}<br/>
     Total time off supply: ${fmtHours(row.time_off_supply_hours_total_approx)} hrs<br/>
     First outage in period: ${formatDateTimeUK(row.first_seen)}<br/>
     Most recent outage: ${formatDateTimeUK(row.last_seen)}<br/>
-    Meta targeting sector: ${row.postcode_sector}
+    Meta targeting sector: ${row.postcode_sector}<br/>
+    <br/><strong>Power cut references (${fmt(refs.length)})</strong><br/>
+    <span class="wrap-list">${truncateList(refs)}</span><br/>
+    <button class="secondary small inline-copy" id="copyRefsBtn">Copy references</button><br/>
+    <br/><strong>Full postcodes recorded (${fmt(postcodes.length)})</strong><br/>
+    <span class="wrap-list">${truncateList(postcodes)}</span><br/>
+    <button class="secondary small inline-copy" id="copyPostcodesBtn">Copy full postcodes</button>
   `;
+
+  document.getElementById("copyRefsBtn")?.addEventListener("click", (event) => copyText(refs.join(", "), event.currentTarget));
+  document.getElementById("copyPostcodesBtn")?.addEventListener("click", (event) => copyText(postcodes.join(", "), event.currentTarget));
 }
 
 function updateEmptyState(sectors) {
@@ -323,29 +367,23 @@ function updateEmptyState(sectors) {
 
 function drawLicenceBoundary() {
   if (state.licenceLayer) state.licenceLayer.remove();
-
   const selected = selectedNetwork();
   const features = (state.payload?.licence_boundaries || []).filter((feature) => {
     const network = feature?.properties?.network;
     return selected === "ALL" || network === selected;
   });
-
   if (!features.length) return;
 
-  state.licenceLayer = L.geoJSON(
-    { type: "FeatureCollection", features },
-    {
-      style: {
-        color: "#f28c28",
-        weight: 3,
-        opacity: 0.95,
-        fillOpacity: 0,
-        dashArray: "8 6",
-        interactive: false,
-      },
-    }
-  ).addTo(state.map);
-
+  state.licenceLayer = L.geoJSON({ type: "FeatureCollection", features }, {
+    style: {
+      color: "#f28c28",
+      weight: 3,
+      opacity: 0.95,
+      fillOpacity: 0,
+      dashArray: "8 6",
+      interactive: false,
+    },
+  }).addTo(state.map);
   state.licenceLayer.bringToFront();
 }
 
@@ -355,30 +393,19 @@ function updateMap() {
   const maxValue = Math.max(...sectors.map((row) => num(row[metric])), 0);
 
   if (state.layer) state.layer.remove();
-
   const group = L.featureGroup();
 
   for (const row of sectors) {
     const colour = colourFor(row[metric], maxValue);
-    const feature = {
-      type: "Feature",
-      properties: { postcode_sector: row.postcode_sector },
-      geometry: row.geometry,
-    };
+    const feature = { type: "Feature", properties: { postcode_sector: row.postcode_sector }, geometry: row.geometry };
 
     const layer = L.geoJSON(feature, {
-      style: {
-        color: "#003865",
-        weight: 0.9,
-        fillColor: colour,
-        fillOpacity: 0.75,
-      },
+      style: { color: "#003865", weight: 0.9, fillColor: colour, fillOpacity: 0.75 },
       onEachFeature: function (_, leafletLayer) {
         leafletLayer.on("click", () => showSectorDetail(row));
         leafletLayer.bindPopup(`<strong>${row.postcode_sector}</strong><br/>${metricLabels[metric]}: ${metric === "time_off_supply_hours_total_approx" ? fmtHours(row[metric]) : fmt(row[metric])}`);
       },
     });
-
     layer.addTo(group);
   }
 
@@ -387,15 +414,11 @@ function updateMap() {
   drawLicenceBoundary();
   updateEmptyState(sectors);
 
-  if (sectors.length > 0) {
-    state.map.fitBounds(group.getBounds(), { padding: [30, 30], maxZoom: 9 });
-  }
+  if (sectors.length > 0) state.map.fitBounds(group.getBounds(), { padding: [30, 30], maxZoom: 9 });
 }
 
 function buildMetaList() {
-  return [...new Set(state.currentSectors.map((row) => (row.postcode_sector || "").trim().toUpperCase()).filter(Boolean))]
-    .sort()
-    .join(", ");
+  return [...new Set(state.currentSectors.map((row) => (row.postcode_sector || "").trim().toUpperCase()).filter(Boolean))].sort().join(", ");
 }
 
 function updateMetaCount() {
@@ -406,16 +429,7 @@ function updateMetaCount() {
 async function copyMetaList() {
   const text = buildMetaList();
   document.getElementById("metaOutput").value = text;
-
-  try {
-    await navigator.clipboard.writeText(text);
-    document.getElementById("copyMetaBtn").textContent = "Copied";
-    setTimeout(() => {
-      document.getElementById("copyMetaBtn").textContent = "Copy visible sectors for Meta";
-    }, 1500);
-  } catch {
-    document.getElementById("copyMetaBtn").textContent = "Copy failed";
-  }
+  await copyText(text, document.getElementById("copyMetaBtn"));
 }
 
 function downloadText(filename, text, type = "text/plain;charset=utf-8") {
@@ -441,8 +455,8 @@ function csvEscape(value) {
 }
 
 function downloadCurrentCsv() {
-  const headers = ["postcode_sector", "network", "outage_type", "outage_count", "total_customers_affected", "time_off_supply_hours_total_approx", "first_seen", "last_seen"];
-  const rows = state.currentSectors.map((row) => headers.map((header) => csvEscape(row[header])).join(","));
+  const headers = ["postcode_sector", "network", "outage_type", "outage_refs", "full_postcodes", "outage_count", "total_customers_affected", "time_off_supply_hours_total_approx", "first_seen", "last_seen"];
+  const rows = state.currentSectors.map((row) => headers.map((header) => csvEscape(Array.isArray(row[header]) ? row[header].join("; ") : row[header])).join(","));
   downloadText("powercut-current-view.csv", [headers.join(","), ...rows].join("\n"), "text/csv;charset=utf-8");
 }
 
@@ -450,80 +464,95 @@ function summariseEvents(events) {
   const outageIds = new Set(events.map((event) => event.outage_id).filter(Boolean));
   const outageTypes = new Set();
   const networks = new Set();
+  const postcodes = new Set();
   let customers = 0;
   let hours = 0;
-
   for (const event of events) {
     customers += num(event.total_customers_affected);
     hours += num(event.time_off_supply_hours_total_approx);
     if (event.network) networks.add(event.network);
+    for (const postcode of event.postcodes || []) postcodes.add(normalisePostcode(postcode));
     for (const part of String(event.outage_type || "").split(",")) {
       const clean = part.trim();
       if (clean) outageTypes.add(clean);
     }
   }
-
-  return { outageCount: outageIds.size, customers, hours, networks: [...networks].sort().join(", ") || "–", outageTypes: [...outageTypes].sort().join(", ") || "–" };
+  return {
+    outageCount: outageIds.size,
+    customers,
+    hours,
+    refs: [...outageIds].sort(),
+    postcodes: [...postcodes].sort(),
+    networks: [...networks].sort().join(", ") || "–",
+    outageTypes: [...outageTypes].sort().join(", ") || "–",
+  };
 }
 
 function eventHasExactPostcode(event, postcode) {
   return (event.postcodes || []).some((candidate) => normalisePostcode(candidate) === postcode);
 }
 
-function handlePostcodeLookup() {
+function eventMatchesSearch(event, query) {
+  const q = compact(query);
+  if (!q) return false;
+  const sector = compact(event.postcode_sector);
+  const ref = compact(event.outage_id);
+  if (ref.includes(q)) return true;
+  if (sector.includes(q) || q.startsWith(sector) || sector.startsWith(q)) return true;
+  return (event.postcodes || []).some((postcode) => compact(postcode).includes(q) || q.includes(compact(postcode)));
+}
+
+function handleSearch() {
   const input = document.getElementById("postcodeSearch");
   const result = document.getElementById("postcodeResult");
-  const postcode = normalisePostcode(input.value);
+  const raw = String(input.value || "").trim();
+  const q = compact(raw);
 
-  if (!postcode) {
-    result.innerHTML = "Enter a postcode to see matching outage history.";
-    return;
-  }
-
-  input.value = postcode;
-
-  const sector = postcodeToSector(postcode);
-  if (!sector) {
-    result.innerHTML = `<strong>${postcode}</strong><br/>Please enter a full postcode, for example AB31 4AA.`;
+  if (!q) {
+    result.innerHTML = "Enter a postcode or reference to search the selected date range.";
     return;
   }
 
   const events = getFilteredEvents();
-  const exactEvents = events.filter((event) => eventHasExactPostcode(event, postcode));
-  const sectorEvents = events.filter((event) => event.postcode_sector === sector);
-  const matchedEvents = exactEvents.length ? exactEvents : sectorEvents;
+  const matchedEvents = events.filter((event) => eventMatchesSearch(event, raw));
 
   if (!matchedEvents.length) {
-    result.innerHTML = `<strong>${postcode}</strong><br/>Postcode sector: ${sector}<br/>No recorded outage history found in the selected date range and network filter.`;
+    result.innerHTML = `<strong>${raw.toUpperCase()}</strong><br/>No matching outage history found in the selected date range, network and power cut type filters.`;
     return;
   }
 
   const summary = summariseEvents(matchedEvents);
-  const matchType = exactEvents.length ? "Exact postcode match" : "No exact postcode match found; showing postcode sector history";
+  const exactPostcode = normalisePostcode(raw);
+  const hasExact = exactPostcode.includes(" ") && matchedEvents.some((event) => eventHasExactPostcode(event, exactPostcode));
+  const sectors = [...new Set(matchedEvents.map((event) => event.postcode_sector).filter(Boolean))].sort();
 
   result.innerHTML = `
-    <strong>${postcode}</strong><br/>
-    ${matchType}<br/>
-    Postcode sector: ${sector}<br/>
+    <strong>${raw.toUpperCase()}</strong><br/>
+    ${hasExact ? "Exact postcode match found." : "Matched by postcode, postcode sector, partial postcode, or power cut reference."}<br/>
+    Matching sectors: ${truncateList(sectors, 30)}<br/>
     Network: ${summary.networks}<br/>
-    Outage type: ${summary.outageTypes}<br/>
+    Power cut type: ${summary.outageTypes}<br/>
     Outages: ${fmt(summary.outageCount)}<br/>
     Customers affected: ${fmt(summary.customers)}<br/>
     Approx. total time off supply: ${fmtHours(summary.hours)} hrs<br/>
-    Meta targeting sector: ${sector}
+    Power cut references (${fmt(summary.refs.length)}): <span class="wrap-list">${truncateList(summary.refs, 50)}</span><br/>
+    Full postcodes recorded (${fmt(summary.postcodes.length)}): <span class="wrap-list">${truncateList(summary.postcodes, 80)}</span><br/>
+    <button class="secondary small inline-copy" id="copySearchRefsBtn">Copy references</button>
+    <button class="secondary small inline-copy" id="copySearchPostcodesBtn">Copy full postcodes</button>
   `;
+
+  document.getElementById("copySearchRefsBtn")?.addEventListener("click", (event) => copyText(summary.refs.join(", "), event.currentTarget));
+  document.getElementById("copySearchPostcodesBtn")?.addEventListener("click", (event) => copyText(summary.postcodes.join(", "), event.currentTarget));
 }
 
 function setQuickRange(range) {
   const minDate = parseDateOnly(state.payload?.available_start);
   const maxDate = parseDateOnly(state.payload?.available_end);
   if (!minDate || !maxDate) return;
-
   let startDate;
   const endDate = maxDate;
   if (range === "ytd") startDate = new Date(Date.UTC(endDate.getUTCFullYear(), 0, 1));
   else startDate = addDays(endDate, -Number(range) + 1);
-
   startDate = clampDate(startDate, minDate, maxDate);
   document.getElementById("startDate").value = toDateInputValue(startDate);
   document.getElementById("endDate").value = toDateInputValue(endDate);
@@ -534,33 +563,25 @@ function initialiseDateInputs() {
   const minDate = parseDateOnly(state.payload?.available_start);
   const maxDate = parseDateOnly(state.payload?.available_end);
   if (!minDate || !maxDate) return;
-
   const startInput = document.getElementById("startDate");
   const endInput = document.getElementById("endDate");
-
   startInput.min = toDateInputValue(minDate);
   startInput.max = toDateInputValue(maxDate);
   endInput.min = toDateInputValue(minDate);
   endInput.max = toDateInputValue(maxDate);
-
   startInput.value = toDateInputValue(clampDate(addDays(maxDate, -29), minDate, maxDate));
   endInput.value = toDateInputValue(maxDate);
-
   document.getElementById("dateRangeNote").textContent = `Available data: ${formatDateUK(minDate)} to ${formatDateUK(maxDate)}. Date filtering is limited to the rolling ${state.payload.rolling_days || 365} days.`;
 }
 
 async function loadData() {
   const response = await fetch(DATA_BASE + DATA_FILE, { cache: "no-store" });
   if (!response.ok) throw new Error(`Failed to load ${DATA_FILE}`);
-
   state.payload = await response.json();
   state.boundaryBySector = new Map((state.payload.boundaries || []).map((boundary) => [boundary.postcode_sector, boundary]));
-
   initialiseDateInputs();
-
   document.getElementById("freshnessNote").textContent = `Last updated: ${formatDateTimeUK(state.payload.generated_at)}`;
   document.getElementById("sourceNote").textContent = `${state.payload.label}. Dashboard is mapped at postcode sector level. Only sectors within SSEN SHEPD/SEPD licence areas are included. Orange dashed line shows the licence-area boundary generated from the postcode-sector boundary file. Total time off supply is approximate.`;
-
   updateAll();
 }
 
@@ -572,7 +593,7 @@ function updateAll() {
   updateMap();
   updateMetaCount();
   const lookupValue = document.getElementById("postcodeSearch")?.value;
-  if (lookupValue) handlePostcodeLookup();
+  if (lookupValue) handleSearch();
 }
 
 function initMap() {
@@ -585,23 +606,19 @@ function initMap() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   initMap();
-
-  ["startDate", "endDate", "networkSelect", "metricSelect", "hotspotLimit", "minOutages", "minCustomers", "minHours"].forEach((id) => {
+  ["startDate", "endDate", "networkSelect", "metricSelect", "hotspotLimit", "outageTypeSelect", "minOutages", "minCustomers", "minHours"].forEach((id) => {
     document.getElementById(id).addEventListener("change", updateAll);
     document.getElementById(id).addEventListener("input", updateAll);
   });
-
   document.getElementById("copyMetaBtn").addEventListener("click", copyMetaList);
   document.getElementById("downloadMetaBtn").addEventListener("click", downloadMetaList);
   document.getElementById("downloadCsvBtn").addEventListener("click", downloadCurrentCsv);
-  document.getElementById("postcodeSearchBtn").addEventListener("click", handlePostcodeLookup);
+  document.getElementById("postcodeSearchBtn").addEventListener("click", handleSearch);
   document.getElementById("postcodeSearch").addEventListener("keydown", (event) => {
-    if (event.key === "Enter") handlePostcodeLookup();
+    if (event.key === "Enter") handleSearch();
   });
-
   document.querySelectorAll("[data-range]").forEach((button) => {
     button.addEventListener("click", () => setQuickRange(button.dataset.range));
   });
-
   await loadData();
 });
