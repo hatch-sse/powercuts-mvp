@@ -94,6 +94,11 @@ h1 {
   align-items: end;
 }
 
+.filter-break {
+  flex-basis: 100%;
+  height: 0;
+}
+
 .filter-note {
   flex-basis: 100%;
   margin-top: 4px;
