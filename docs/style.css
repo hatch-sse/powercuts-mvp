@@ -42,11 +42,10 @@ body {
 }
 
 .ssen-logo {
-  color: #ffffff;
-  font-size: clamp(30px, 5vw, 54px);
-  font-weight: 950;
-  letter-spacing: -0.08em;
-  line-height: 0.9;
+  display: block;
+  width: 160px;
+  height: auto;
+  max-height: 42px;
 }
 
 .eyebrow {
