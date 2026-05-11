@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SSEN Power Cut Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
   <main class="shell">
@@ -61,6 +61,14 @@
           <option value="100">Top 100</option>
         </select>
       </label>
+      <label>Power cut type
+        <select id="outageTypeSelect">
+          <option value="ALL">All types</option>
+          <option value="HV">HV</option>
+          <option value="LV">LV</option>
+          <option value="PSI">PSI</option>
+        </select>
+      </label>
       <label>Minimum outages
         <input type="number" id="minOutages" min="0" step="1" value="0" />
       </label>
@@ -87,14 +95,14 @@
 
     <section class="lookup-card">
       <div>
-        <h2>Postcode lookup</h2>
-        <p class="note">Search a full postcode to check exact matches first, with postcode-sector fallback for the selected date range.</p>
+        <h2>Search</h2>
+        <p class="note">Search by full postcode, partial postcode, postcode sector, or power cut reference such as TC9063.</p>
       </div>
       <div class="lookup-controls">
-        <input id="postcodeSearch" type="text" placeholder="e.g. AB31 4AA" autocomplete="postal-code" />
+        <input id="postcodeSearch" type="text" placeholder="e.g. AB31 4AA, AB31, or TC9063" autocomplete="postal-code" />
         <button id="postcodeSearchBtn">Search</button>
       </div>
-      <div id="postcodeResult" class="lookup-result note">Enter a postcode to see matching outage history.</div>
+      <div id="postcodeResult" class="lookup-result note">Enter a postcode or reference to search the selected date range.</div>
     </section>
 
     <section class="dashboard">
@@ -104,6 +112,7 @@
           <strong id="legendTitle">Outages</strong>
           <div class="legend-scale"></div>
           <div class="legend-row"><span>Lower</span><span>Higher</span></div>
+          <div class="legend-boundary"><span class="legend-boundary-line"></span><span>Licence boundary</span></div>
         </div>
         <div id="emptyState" class="empty-state" hidden></div>
       </div>
@@ -119,7 +128,7 @@
 
         <section class="detail-card">
           <h2>Selected sector</h2>
-          <div id="sectorDetail" class="note">Click a sector on the map to see more detail.</div>
+          <div id="sectorDetail" class="note">Click a sector on the map to see more detail, including full postcodes and power cut references.</div>
         </section>
 
         <h2>Meta export</h2>
@@ -141,6 +150,6 @@
     <footer><p id="sourceNote">Loading data…</p></footer>
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
