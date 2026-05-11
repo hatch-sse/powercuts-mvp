@@ -42,6 +42,17 @@ function selectedMetric() {
   return document.getElementById("metricSelect").value;
 }
 
+function normalisePostcode(value) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+function postcodeToSector(postcode) {
+  const cleaned = normalisePostcode(postcode);
+  const parts = cleaned.split(" ");
+  if (parts.length !== 2 || !parts[1]) return "";
+  return `${parts[0]} ${parts[1][0]}`;
+}
+
 function parseDateOnly(value) {
   if (!value) return null;
   const [year, month, day] = value.split("-").map(Number);
@@ -304,6 +315,82 @@ function downloadMetaList() {
   URL.revokeObjectURL(url);
 }
 
+function summariseEvents(events) {
+  const outageIds = new Set(events.map((event) => event.outage_id).filter(Boolean));
+  const outageTypes = new Set();
+  const networks = new Set();
+  let customers = 0;
+  let hours = 0;
+
+  for (const event of events) {
+    customers += num(event.total_customers_affected);
+    hours += num(event.time_off_supply_hours_total_approx);
+    if (event.network) networks.add(event.network);
+    for (const part of String(event.outage_type || "").split(",")) {
+      const clean = part.trim();
+      if (clean) outageTypes.add(clean);
+    }
+  }
+
+  return {
+    outageCount: outageIds.size,
+    customers,
+    hours,
+    networks: [...networks].sort().join(", ") || "–",
+    outageTypes: [...outageTypes].sort().join(", ") || "–",
+  };
+}
+
+function eventHasExactPostcode(event, postcode) {
+  return (event.postcodes || []).some((candidate) => normalisePostcode(candidate) === postcode);
+}
+
+function handlePostcodeLookup() {
+  const input = document.getElementById("postcodeSearch");
+  const result = document.getElementById("postcodeResult");
+  const postcode = normalisePostcode(input.value);
+
+  if (!postcode) {
+    result.innerHTML = "Enter a postcode to see matching outage history.";
+    return;
+  }
+
+  const sector = postcodeToSector(postcode);
+  if (!sector) {
+    result.innerHTML = `<strong>${postcode}</strong><br/>Please enter a full postcode with a space, for example AB31 4AA.`;
+    return;
+  }
+
+  const events = getFilteredEvents();
+  const exactEvents = events.filter((event) => eventHasExactPostcode(event, postcode));
+  const sectorEvents = events.filter((event) => event.postcode_sector === sector);
+  const matchedEvents = exactEvents.length ? exactEvents : sectorEvents;
+
+  if (!matchedEvents.length) {
+    result.innerHTML = `
+      <strong>${postcode}</strong><br/>
+      Postcode sector: ${sector}<br/>
+      No recorded outage history found in the selected date range and network filter.
+    `;
+    return;
+  }
+
+  const summary = summariseEvents(matchedEvents);
+  const matchType = exactEvents.length ? "Exact postcode match" : "No exact postcode match found; showing postcode sector history";
+
+  result.innerHTML = `
+    <strong>${postcode}</strong><br/>
+    ${matchType}<br/>
+    Postcode sector: ${sector}<br/>
+    Network: ${summary.networks}<br/>
+    Outage type: ${summary.outageTypes}<br/>
+    Outages: ${fmt(summary.outageCount)}<br/>
+    Customers affected: ${fmt(summary.customers)}<br/>
+    Approx. time off supply: ${fmtHours(summary.hours)} hrs<br/>
+    Meta targeting sector: ${sector}
+  `;
+}
+
 function setQuickRange(range) {
   const minDate = parseDateOnly(state.payload?.available_start);
   const maxDate = parseDateOnly(state.payload?.available_end);
@@ -367,6 +454,8 @@ function updateAll() {
   updateCards();
   updateTable();
   updateMap();
+  const lookupValue = document.getElementById("postcodeSearch")?.value;
+  if (lookupValue) handlePostcodeLookup();
 }
 
 function initMap() {
@@ -386,6 +475,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("metricSelect").addEventListener("change", updateAll);
   document.getElementById("copyMetaBtn").addEventListener("click", copyMetaList);
   document.getElementById("downloadMetaBtn").addEventListener("click", downloadMetaList);
+  document.getElementById("postcodeSearchBtn").addEventListener("click", handlePostcodeLookup);
+  document.getElementById("postcodeSearch").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") handlePostcodeLookup();
+  });
 
   document.querySelectorAll("[data-range]").forEach((button) => {
     button.addEventListener("click", () => setQuickRange(button.dataset.range));
