@@ -54,7 +54,8 @@ function selectedOutageType() {
 }
 
 function thresholdValue(id) {
-  return num(document.getElementById(id)?.value || 0);
+  const element = document.getElementById(id);
+  return element ? num(element.value || 0) : 0;
 }
 
 function sectorKey(row) {
@@ -292,7 +293,7 @@ function updateCards() {
   document.getElementById("sectorsCard").textContent = new Set(sectors.map((row) => row.postcode_sector).filter(Boolean)).size.toLocaleString("en-GB");
   document.getElementById("outagesCard").textContent = fmt(totalOutages);
   document.getElementById("customersCard").textContent = fmt(customers);
-  document.getElementById("timeCard").textContent = `${fmtHours(hours)} hours`;
+  document.getElementById("timeCard").textContent = fmtHours(hours);
 }
 
 function openLayerPopup(layer) {
@@ -630,8 +631,10 @@ function initMap() {
 document.addEventListener("DOMContentLoaded", async () => {
   initMap();
   ["startDate", "endDate", "networkSelect", "metricSelect", "hotspotLimit", "outageTypeSelect", "minOutages", "minCustomers", "minHours"].forEach((id) => {
-    document.getElementById(id).addEventListener("change", updateAll);
-    document.getElementById(id).addEventListener("input", updateAll);
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.addEventListener("change", updateAll);
+    element.addEventListener("input", updateAll);
   });
   document.getElementById("copyMetaBtn").addEventListener("click", copyMetaList);
   document.getElementById("downloadMetaBtn").addEventListener("click", downloadMetaList);
