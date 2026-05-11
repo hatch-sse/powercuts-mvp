@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SSEN Power Interruption Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=14" />
+  <link rel="stylesheet" href="style.css?v=15" />
 </head>
 <body>
   <main class="shell">
     <header class="portal-hero">
       <div class="portal-topbar">
-        <img class="ssen-logo" src="assets/ssen-logo-white.svg" alt="SSEN" />
+        <div class="ssen-wordmark" aria-label="Scottish and Southern Electricity Networks">
+          <span class="ssen-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="ssen-text">Scottish &amp; Southern<br/>Electricity Networks</span>
+        </div>
       </div>
       <div class="portal-hero-grid">
         <div class="portal-intro">
@@ -144,6 +147,6 @@
     <footer><p id="sourceNote">Loading data…</p></footer>
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>
