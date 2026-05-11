@@ -606,7 +606,6 @@ async function loadData() {
   state.boundaryBySector = new Map((state.payload.boundaries || []).map((boundary) => [boundary.postcode_sector, boundary]));
   initialiseDateInputs();
   document.getElementById("freshnessNote").textContent = `Last updated: ${formatDateTimeUK(state.payload.generated_at)}`;
-  document.getElementById("sourceNote").textContent = `${state.payload.label}. Dashboard is mapped at postcode sector level. Only sectors within SSEN SHEPD/SEPD licence areas are included. Orange dashed line shows the licence-area boundary generated from the postcode-sector boundary file. Total time off supply is approximate.`;
   updateAll();
 }
 
