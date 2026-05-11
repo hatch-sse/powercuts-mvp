@@ -78,14 +78,7 @@ h1 {
   line-height: 1.5;
 }
 
-.controls, .filter-card {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.filter-card, .insight-card, .lookup-card, .about-card {
+.filter-card, .lookup-card, .about-card {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -94,12 +87,16 @@ h1 {
 }
 
 .filter-card {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
   justify-content: flex-start;
   align-items: end;
 }
 
-.insight-card {
-  border-left: 6px solid var(--accent);
+.filter-note {
+  flex-basis: 100%;
+  margin-top: 4px;
 }
 
 label {
@@ -126,7 +123,10 @@ select, input[type="date"], input[type="text"], input[type="number"] {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-  margin: 18px 0 24px;
+}
+
+.inline-ranges {
+  margin-left: auto;
 }
 
 .cards {
@@ -138,6 +138,10 @@ select, input[type="date"], input[type="text"], input[type="number"] {
   margin: 24px 0;
   border-radius: 16px;
   overflow: hidden;
+}
+
+.cards-top {
+  margin: 24px 0;
 }
 
 .card {
@@ -348,6 +352,14 @@ button.small {
   font-size: 13px;
 }
 
+.inline-copy {
+  margin-top: 6px;
+}
+
+.wrap-list {
+  word-break: break-word;
+}
+
 textarea {
   width: 100%;
   min-height: 120px;
@@ -378,7 +390,8 @@ footer {
 
 @media (max-width: 980px) {
   .hero, .dashboard, .lookup-card { grid-template-columns: 1fr; }
-  .hero-side, .controls, .lookup-controls { justify-content: start; justify-items: start; }
+  .hero-side, .lookup-controls { justify-content: start; justify-items: start; }
   .cards { grid-template-columns: repeat(2, 1fr); }
+  .inline-ranges { margin-left: 0; }
   #map, .map-wrap { min-height: 520px; }
 }
