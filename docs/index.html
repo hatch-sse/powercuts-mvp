@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SSEN Powercuts Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">SSEN outage history</p>
+        <h1>Powercut dashboard</h1>
+        <p class="lede">Explore affected postcode areas, compare SHEPD and SEPD, and export Meta-ready postcode sectors.</p>
+      </div>
+      <div class="controls">
+        <label>Period
+          <select id="periodSelect">
+            <option value="dashboard_current_year.json">Current year</option>
+            <option value="dashboard_current_month.json">Current month</option>
+          </select>
+        </label>
+        <label>Network
+          <select id="networkSelect">
+            <option value="ALL">All</option>
+            <option value="SHEPD">SHEPD</option>
+            <option value="SEPD">SEPD</option>
+          </select>
+        </label>
+        <label>Metric
+          <select id="metricSelect">
+            <option value="outage_count">Outages</option>
+            <option value="total_customers_affected">Customers affected</option>
+            <option value="time_off_supply_hours_total_approx">Time off supply</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <section class="cards">
+      <article class="card"><span>Mapped areas</span><strong id="areasCard">–</strong></article>
+      <article class="card"><span>Postcode sectors</span><strong id="sectorsCard">–</strong></article>
+      <article class="card"><span>Total outages</span><strong id="outagesCard">–</strong></article>
+      <article class="card"><span>Customers affected</span><strong id="customersCard">–</strong></article>
+      <article class="card"><span>Time off supply</span><strong id="timeCard">–</strong></article>
+    </section>
+
+    <section class="dashboard">
+      <div id="map"></div>
+      <aside class="panel">
+        <h2>Top areas</h2>
+        <p id="metricNote" class="note"></p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Area</th><th>Network</th><th id="metricHeader">Metric</th></tr></thead>
+            <tbody id="topTable"></tbody>
+          </table>
+        </div>
+
+        <h2>Meta export</h2>
+        <p class="note">Copies unique postcode sectors for the current filter.</p>
+        <button id="copyMetaBtn">Copy sectors for Meta</button>
+        <button id="downloadMetaBtn" class="secondary">Download sectors</button>
+        <textarea id="metaOutput" readonly placeholder="Postcode sectors will appear here after copying/exporting."></textarea>
+      </aside>
+    </section>
+
+    <footer><p id="sourceNote">Loading data…</p></footer>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
