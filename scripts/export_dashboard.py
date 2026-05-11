@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from shapely.geometry import mapping, shape
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Polygon, mapping, shape
 from shapely.ops import unary_union
 
 from db import get_connection, init_db
@@ -94,6 +94,25 @@ def read_sector_boundaries() -> dict[str, dict[str, Any]]:
     return boundaries
 
 
+def exterior_lines_only(geometry: Any) -> MultiLineString:
+    lines: list[LineString] = []
+
+    if isinstance(geometry, Polygon):
+        if not geometry.is_empty:
+            lines.append(LineString(geometry.exterior.coords))
+
+    elif isinstance(geometry, MultiPolygon):
+        for polygon in geometry.geoms:
+            if not polygon.is_empty:
+                lines.append(LineString(polygon.exterior.coords))
+
+    elif hasattr(geometry, "geoms"):
+        for part in geometry.geoms:
+            lines.extend(exterior_lines_only(part).geoms)
+
+    return MultiLineString(lines)
+
+
 def build_licence_boundary_overlay(boundaries: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     overlays: list[dict[str, Any]] = []
 
@@ -104,6 +123,8 @@ def build_licence_boundary_overlay(boundaries: dict[str, dict[str, Any]]) -> lis
                 continue
             try:
                 geom = shape(boundary["geometry"])
+                if not geom.is_valid:
+                    geom = geom.buffer(0)
             except Exception:
                 continue
             if not geom.is_empty:
@@ -113,14 +134,15 @@ def build_licence_boundary_overlay(boundaries: dict[str, dict[str, Any]]) -> lis
             continue
 
         unioned = unary_union(geoms)
-        outline = unioned.boundary.simplify(BOUNDARY_SIMPLIFY_TOLERANCE, preserve_topology=True)
+        simplified = unioned.simplify(BOUNDARY_SIMPLIFY_TOLERANCE, preserve_topology=True)
+        outline = exterior_lines_only(simplified)
 
         overlays.append(
             {
                 "type": "Feature",
                 "properties": {
                     "network": network,
-                    "label": f"{network} licence area boundary",
+                    "label": f"{network} licence area outer boundary",
                 },
                 "geometry": mapping(outline),
             }
@@ -274,7 +296,7 @@ def build_dashboard() -> None:
             "Only sectors within the official SSEN SHEPD/SEPD licence areas are included.",
             "Dashboard data is limited to a rolling 12-month window to keep the public site lightweight.",
             "Time off supply is approximate and based on captured outage windows.",
-            "Licence boundary overlay is generated from the SSEN postcode sector boundary file.",
+            "Licence boundary overlay is generated from the outer edge of the SSEN postcode sector boundary file.",
         ],
         "boundaries": boundary_rows,
         "licence_boundaries": licence_boundaries,
