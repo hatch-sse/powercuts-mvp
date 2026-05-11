@@ -5,28 +5,31 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SSEN Power Interruption Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=11" />
+  <link rel="stylesheet" href="style.css?v=12" />
 </head>
 <body>
   <main class="shell">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">SSEN outage history</p>
-        <h1>Power interruption insights</h1>
-        <p class="lede">Explore recent SSEN power interruption history by postcode sector, filter by date range and network, and export Meta-ready targeting sectors.</p>
-        <p id="freshnessNote" class="freshness">Loading latest update…</p>
-      </div>
-      <div class="hero-side">
+    <header class="portal-hero">
+      <div class="portal-topbar">
         <img class="ssen-logo" src="assets/ssen-logo-white.svg" alt="SSEN" />
+        <span class="portal-pill">Data portal</span>
+      </div>
+      <div class="portal-hero-grid">
+        <div class="portal-intro">
+          <div class="portal-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <p class="eyebrow">SSEN outage history</p>
+          <h1>Power interruption insights</h1>
+          <p class="lede">Explore recent SSEN power interruption history by postcode sector, filter by date range and network, and export Meta-ready targeting sectors.</p>
+          <p id="freshnessNote" class="freshness">Loading latest update…</p>
+        </div>
+        <section class="cards cards-top">
+          <article class="card"><strong id="sectorsCard">–</strong><span>Postcode sectors</span></article>
+          <article class="card"><strong id="outagesCard">–</strong><span>Total outages</span></article>
+          <article class="card"><strong id="customersCard">–</strong><span>Customers affected</span></article>
+          <article class="card"><strong id="timeCard">–</strong><span>Total time off supply</span></article>
+        </section>
       </div>
     </header>
-
-    <section class="cards cards-top">
-      <article class="card"><span>Postcode sectors</span><strong id="sectorsCard">–</strong></article>
-      <article class="card"><span>Total outages</span><strong id="outagesCard">–</strong></article>
-      <article class="card"><span>Customers affected</span><strong id="customersCard">–</strong></article>
-      <article class="card"><span>Total time off supply</span><strong id="timeCard">–</strong></article>
-    </section>
 
     <section class="filter-card">
       <label>Start date
