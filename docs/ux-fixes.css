@@ -1,0 +1,63 @@
+/* Layout refinements based on user testing feedback */
+
+/* Keep quick date buttons visually grouped with the date fields */
+.quick-ranges.inline-ranges {
+  align-self: end;
+  margin-left: auto;
+}
+
+/* Put the search input underneath the Search heading/help text */
+.embedded-search {
+  grid-template-columns: 1fr !important;
+  align-items: start;
+  gap: 12px;
+}
+
+.search-heading {
+  max-width: 760px;
+}
+
+.lookup-controls {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(260px, 460px) auto;
+  justify-content: start;
+  align-items: center;
+}
+
+.lookup-controls input {
+  width: 100%;
+}
+
+/* Keep the dropdown filters together on one line where there is room */
+.filter-card label:has(select) {
+  min-width: 170px;
+}
+
+@media (max-width: 980px) {
+  .quick-ranges.inline-ranges {
+    margin-left: 0;
+  }
+
+  .lookup-controls {
+    grid-template-columns: 1fr auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .quick-ranges.inline-ranges {
+    width: 100%;
+  }
+
+  .lookup-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .lookup-controls button {
+    width: 100%;
+  }
+
+  .filter-card label:has(select) {
+    min-width: 0;
+  }
+}
