@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SSEN Power Interruption Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=19" />
 </head>
 <body>
   <main class="shell">
@@ -35,6 +35,15 @@
         <label>End date
           <input type="date" id="endDate" />
         </label>
+        <div class="quick-ranges inline-ranges" aria-label="Quick date ranges">
+          <button class="secondary small" data-range="7">Last 7 days</button>
+          <button class="secondary small" data-range="30">Last 30 days</button>
+          <button class="secondary small" data-range="90">Last 90 days</button>
+          <button class="secondary small" data-range="ytd">Year to date</button>
+        </div>
+
+        <div class="filter-break" aria-hidden="true"></div>
+
         <label>Network
           <select id="networkSelect">
             <option value="ALL">All</option>
@@ -42,13 +51,6 @@
             <option value="SEPD">SEPD</option>
           </select>
         </label>
-        <div class="quick-ranges inline-ranges" aria-label="Quick date ranges">
-          <button class="secondary small" data-range="7">Last 7 days</button>
-          <button class="secondary small" data-range="30">Last 30 days</button>
-          <button class="secondary small" data-range="90">Last 90 days</button>
-          <button class="secondary small" data-range="ytd">Year to date</button>
-        </div>
-        <div class="filter-break" aria-hidden="true"></div>
         <label>Metric
           <select id="metricSelect">
             <option value="outage_count">Outages</option>
@@ -73,9 +75,11 @@
             <option value="PSI">PSI</option>
           </select>
         </label>
+
         <div class="filter-break" aria-hidden="true"></div>
+
         <div class="embedded-search">
-          <div>
+          <div class="search-heading">
             <h2>Search</h2>
             <p class="note">Search by full postcode, partial postcode, postcode sector, or power cut reference such as TC9063.</p>
           </div>
@@ -133,5 +137,15 @@
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="app.js?v=15"></script>
+  <script>
+    // Some mobile browsers defer tile rendering during animated map zooms.
+    // Dispatching a resize after map/table sector selection nudges Leaflet to redraw tiles.
+    document.addEventListener("click", function (event) {
+      if (event.target.closest("#topTable tr") || event.target.closest("#map")) {
+        window.setTimeout(function () { window.dispatchEvent(new Event("resize")); }, 250);
+        window.setTimeout(function () { window.dispatchEvent(new Event("resize")); }, 900);
+      }
+    });
+  </script>
 </body>
 </html>
