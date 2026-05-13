@@ -1,0 +1,10 @@
+{
+  "source_file": "ONSPD_NOV_2025.zip",
+  "prepared_file": "postcode-local-authority-lookup-live-uk.csv.gz",
+  "recommended_github_path": "docs/data/postcode-local-authority-lookup-live-uk.csv.gz",
+  "rows_live_postcodes": 1807071,
+  "columns": ["postcode", "postcode_compact", "postcode_sector", "local_authority_code"],
+  "filter": "doterm is blank; terminated postcodes removed",
+  "sha256": "95bf339be1cc3a5639fff2970d76e78f406da4c12744e07865d86a0d6749debb",
+  "size_bytes": 8424042
+}
