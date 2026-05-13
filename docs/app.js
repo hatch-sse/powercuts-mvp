@@ -189,6 +189,26 @@ function getFilteredEvents() {
   });
 }
 
+function eventPostcodeDetails(event) {
+  if (Array.isArray(event.postcodes_detail) && event.postcodes_detail.length) {
+    return event.postcodes_detail.map((detail) => ({
+      postcode: normalisePostcode(detail.postcode),
+      postcode_sector: detail.postcode_sector || event.postcode_sector,
+      local_authority_code: detail.local_authority_code || event.local_authority_code || "",
+      local_authority_name: detail.local_authority_name || event.local_authority_name || "",
+      local_authority_match_method: detail.local_authority_match_method || event.local_authority_match_method || "",
+    })).filter((detail) => detail.postcode);
+  }
+
+  return (event.postcodes || []).map((postcode) => ({
+    postcode: normalisePostcode(postcode),
+    postcode_sector: event.postcode_sector,
+    local_authority_code: event.local_authority_code || "",
+    local_authority_name: event.local_authority_name || "",
+    local_authority_match_method: event.local_authority_match_method || "",
+  })).filter((detail) => detail.postcode);
+}
+
 function aggregateEventsToSectors(events) {
   const grouped = new Map();
 
@@ -202,6 +222,9 @@ function aggregateEventsToSectors(events) {
         outage_type_set: new Set(),
         outage_ids: new Set(),
         postcodes_set: new Set(),
+        postcode_detail_by_postcode: new Map(),
+        local_authority_codes: new Set(),
+        local_authority_names: new Set(),
         total_customers_affected: 0,
         time_off_supply_hours_total_approx: 0,
         first_seen: event.first_seen,
@@ -212,7 +235,14 @@ function aggregateEventsToSectors(events) {
 
     const row = grouped.get(key);
     row.outage_ids.add(event.outage_id);
-    for (const postcode of event.postcodes || []) row.postcodes_set.add(normalisePostcode(postcode));
+
+    for (const detail of eventPostcodeDetails(event)) {
+      row.postcodes_set.add(detail.postcode);
+      if (!row.postcode_detail_by_postcode.has(detail.postcode)) row.postcode_detail_by_postcode.set(detail.postcode, detail);
+      if (detail.local_authority_code) row.local_authority_codes.add(detail.local_authority_code);
+      if (detail.local_authority_name) row.local_authority_names.add(detail.local_authority_name);
+    }
+
     row.total_customers_affected += num(event.total_customers_affected);
     row.time_off_supply_hours_total_approx += num(event.time_off_supply_hours_total_approx);
     if (event.first_seen && (!row.first_seen || event.first_seen < row.first_seen)) row.first_seen = event.first_seen;
@@ -230,6 +260,9 @@ function aggregateEventsToSectors(events) {
     outage_type: [...row.outage_type_set].sort().join(","),
     outage_refs: [...row.outage_ids].sort(),
     full_postcodes: [...row.postcodes_set].sort(),
+    full_postcodes_detail: [...row.postcode_detail_by_postcode.values()].sort((a, b) => a.postcode.localeCompare(b.postcode)),
+    local_authority_code: [...row.local_authority_codes].sort().join("; "),
+    local_authority_name: [...row.local_authority_names].sort().join("; "),
     outage_count: row.outage_ids.size,
     total_customers_affected: row.total_customers_affected,
     time_off_supply_hours_total_approx: row.time_off_supply_hours_total_approx,
@@ -356,6 +389,7 @@ function showSectorDetail(row) {
   document.getElementById("sectorDetail").innerHTML = `
     <strong>${row.postcode_sector}</strong><br/>
     Network: ${row.network || "–"}<br/>
+    Council area: ${row.local_authority_name || "–"}<br/>
     Power cut type: ${row.outage_type || "–"}<br/>
     Outages: ${fmt(row.outage_count)}<br/>
     Customers affected: ${fmt(row.total_customers_affected)}<br/>
@@ -479,7 +513,7 @@ function csvEscape(value) {
 }
 
 function downloadCurrentCsv() {
-  const headers = ["postcode_sector", "network", "outage_type", "outage_refs", "full_postcodes", "outage_count", "total_customers_affected", "time_off_supply_hours_total_approx", "first_seen", "last_seen"];
+  const headers = ["postcode_sector", "network", "local_authority_code", "local_authority_name", "outage_type", "outage_refs", "full_postcodes", "outage_count", "total_customers_affected", "time_off_supply_hours_total_approx", "first_seen", "last_seen"];
   const rows = state.currentSectors.map((row) => headers.map((header) => csvEscape(Array.isArray(row[header]) ? row[header].join("; ") : row[header])).join(","));
   downloadText("powercut-current-view.csv", [headers.join(","), ...rows].join("\n"), "text/csv;charset=utf-8");
 }
