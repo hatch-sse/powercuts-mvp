@@ -21,12 +21,6 @@ const cseNeedLabels = {
   mental_health: "Mental health",
 };
 
-const cseMetricLabels = {
-  psr_reach: "PSR reach",
-  psr_records: "PSR records",
-  eligibility_estimate: "Eligibility estimate",
-};
-
 function cseNum(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
@@ -43,34 +37,30 @@ function csePct(value) {
   });
 }
 
+function cseReachThreshold() {
+  const input = document.getElementById("cseReachThreshold");
+  const raw = String(input?.value || "").trim();
+  if (!raw) return null;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(100, value)) / 100;
+}
+
 function cseMetricValue(row) {
   const need = document.getElementById("cseNeedSelect")?.value || "overall";
-  const metric = document.getElementById("cseMetricSelect")?.value || "psr_reach";
-  return row?.needs?.[need]?.[metric];
+  return row?.needs?.[need]?.psr_reach;
 }
 
 function cseMetricDisplay(value) {
-  const metric = document.getElementById("cseMetricSelect")?.value || "psr_reach";
-  return metric === "psr_reach" ? csePct(value) : cseFmt(value);
+  return csePct(value);
 }
 
-function cseColourFor(value, maxValue) {
-  const metric = document.getElementById("cseMetricSelect")?.value || "psr_reach";
-
-  if (metric === "psr_reach") {
-    const capped = Math.max(0, Math.min(1, cseNum(value)));
-    const t = 1 - capped;
-    const r = Math.round(210 + 30 * t);
-    const g = Math.round(242 - 125 * t);
-    const b = Math.round(240 - 165 * t);
-    return `rgb(${r},${g},${b})`;
-  }
-
-  const max = cseNum(maxValue) || 1;
-  const t = Math.max(0, Math.min(1, Math.log10(cseNum(value) + 1) / Math.log10(max + 1)));
-  const r = Math.round(210 - 150 * t);
-  const g = Math.round(242 - 105 * t);
-  const b = Math.round(240 - 80 * t);
+function cseColourFor(value) {
+  const capped = Math.max(0, Math.min(1, cseNum(value)));
+  const t = 1 - capped;
+  const r = Math.round(210 + 30 * t);
+  const g = Math.round(242 - 125 * t);
+  const b = Math.round(240 - 165 * t);
   return `rgb(${r},${g},${b})`;
 }
 
@@ -102,26 +92,13 @@ function populateCouncilDropdown() {
 
 function cseVisibleRows() {
   const need = document.getElementById("cseNeedSelect")?.value || "overall";
-  const threshold = document.getElementById("cseReachThreshold")?.value || "ALL";
+  const threshold = cseReachThreshold();
   const selectedCouncil = selectedCouncilArea();
-  const powercutOnly = document.getElementById("csePowercutOnly")?.checked || false;
-  const sectors = state.currentSectors || [];
-  const sectorAuthorityNames = new Set(
-    sectors
-      .map((row) => String(row.local_authority_name || row.local_authority || row.council_area || "").toLowerCase())
-      .filter(Boolean)
-  );
 
   return [...cseState.rowsByCode.values()].filter((row) => {
     if (!row?.needs?.[need]) return false;
     if (selectedCouncil !== "ALL" && row.local_authority_code !== selectedCouncil) return false;
-    if (threshold !== "ALL" && cseNum(row.needs[need].psr_reach) > Number(threshold)) return false;
-
-    // If the outage data does not carry local authority names yet, keep areas visible rather than hiding everything.
-    if (powercutOnly && sectorAuthorityNames.size && !sectorAuthorityNames.has(String(row.local_authority_name || "").toLowerCase())) {
-      return false;
-    }
-
+    if (threshold !== null && cseNum(row.needs[need].psr_reach) > threshold) return false;
     return true;
   });
 }
@@ -136,7 +113,7 @@ function updateCseSummary() {
 
   const rows = cseVisibleRows();
   const need = document.getElementById("cseNeedSelect")?.value || "overall";
-  const metric = document.getElementById("cseMetricSelect")?.value || "psr_reach";
+  const threshold = cseReachThreshold();
 
   if (!cseState.enabled) {
     summary.textContent = "Switch on PSR CSE data to show local authority reach and campaign priority.";
@@ -144,7 +121,8 @@ function updateCseSummary() {
   }
 
   const lowReach = rows.filter((row) => cseNum(row.needs?.[need]?.psr_reach) < 0.75).length;
-  summary.textContent = `${rows.length.toLocaleString("en-GB")} council areas shown. ${lowReach.toLocaleString("en-GB")} have ${cseNeedLabels[need]} PSR reach below 75%. Current colour: ${cseMetricLabels[metric]}.`;
+  const thresholdText = threshold !== null ? ` Filtered to maximum PSR reach of ${csePct(threshold)}.` : "";
+  summary.textContent = `${rows.length.toLocaleString("en-GB")} council areas shown. ${lowReach.toLocaleString("en-GB")} have ${cseNeedLabels[need]} PSR reach below 75%. Colour shows PSR reach.${thresholdText}`;
 }
 
 async function ensureCseDataLoaded() {
@@ -171,19 +149,37 @@ function showCseControls(show) {
   });
 }
 
+function csePowercutOverlapEnabled() {
+  return Boolean(document.getElementById("csePowercutOnly")?.checked);
+}
+
+function updatePowercutLayerVisibility() {
+  if (!state?.map) return;
+
+  const hidePowercuts = cseState.enabled && csePowercutOverlapEnabled();
+
+  if (state.layer) {
+    if (hidePowercuts && state.map.hasLayer(state.layer)) state.layer.remove();
+    if (!hidePowercuts && !state.map.hasLayer(state.layer)) state.layer.addTo(state.map);
+  }
+
+  if (state.licenceLayer) {
+    if (hidePowercuts && state.map.hasLayer(state.licenceLayer)) state.licenceLayer.remove();
+    if (!hidePowercuts && !state.map.hasLayer(state.licenceLayer)) state.licenceLayer.addTo(state.map);
+  }
+}
+
 function csePopupHtml(row) {
   const need = document.getElementById("cseNeedSelect")?.value || "overall";
-  const metric = document.getElementById("cseMetricSelect")?.value || "psr_reach";
   const values = row.needs?.[need] || {};
   const overall = row.needs?.overall || {};
 
   return `
     <strong>${row.local_authority_name}</strong><br/>
     Needs group: ${cseNeedLabels[need]}<br/>
-    ${cseMetricLabels[metric]}: ${cseMetricDisplay(values[metric])}<br/>
+    PSR reach: ${cseMetricDisplay(values.psr_reach)}<br/>
     PSR records: ${cseFmt(values.psr_records)}<br/>
     Eligibility estimate: ${cseFmt(values.eligibility_estimate)}<br/>
-    PSR reach: ${csePct(values.psr_reach)}<br/>
     <br/>Overall PSR reach: ${csePct(overall.psr_reach)}
   `;
 }
@@ -194,14 +190,14 @@ function drawCseLayer() {
     cseState.layer = null;
   }
 
+  updatePowercutLayerVisibility();
+
   if (!cseState.enabled || !cseState.boundaries || !state.map) {
     updateCseSummary();
     return;
   }
 
   const visibleCodes = cseVisibleCodes();
-  const metricValues = cseVisibleRows().map(cseMetricValue);
-  const maxValue = Math.max(...metricValues.map(cseNum), 0);
 
   cseState.layer = L.geoJSON(cseState.boundaries, {
     filter: (feature) => visibleCodes.has(feature?.properties?.LAD24CD),
@@ -212,7 +208,7 @@ function drawCseLayer() {
         color: "#ffffff",
         weight: 1.2,
         opacity: 0.9,
-        fillColor: cseColourFor(value, maxValue),
+        fillColor: cseColourFor(value),
         fillOpacity: 0.55,
       };
     },
@@ -227,8 +223,8 @@ function drawCseLayer() {
     },
   }).addTo(state.map);
 
-  if (state.layer) state.layer.bringToFront();
-  if (state.licenceLayer) state.licenceLayer.bringToFront();
+  if (!csePowercutOverlapEnabled() && state.layer) state.layer.bringToFront();
+  if (!csePowercutOverlapEnabled() && state.licenceLayer) state.licenceLayer.bringToFront();
   updateCseSummary();
 }
 
@@ -295,8 +291,6 @@ function buildCseCampaignCsv() {
 
   const rows = [];
 
-  // The current outage dataset is postcode-sector based. Until sectors are tagged with LAD codes,
-  // include visible sector export rows plus the selected CSE context for planning.
   for (const sector of rowsBySector) {
     for (const cseRow of cseRows) {
       const values = cseRow.needs?.[need] || {};
@@ -337,11 +331,16 @@ function setupCseControls() {
     drawCseLayer();
   });
 
-  ["cseNeedSelect", "cseMetricSelect", "cseReachThreshold", "cseCouncilSearch", "csePowercutOnly"].forEach((id) => {
+  ["cseNeedSelect", "cseReachThreshold", "cseCouncilSearch", "csePowercutOnly"].forEach((id) => {
     const element = document.getElementById(id);
     if (!element) return;
     element.addEventListener("change", drawCseLayer);
     element.addEventListener("input", drawCseLayer);
+  });
+
+  document.getElementById("cseReachThreshold")?.addEventListener("input", (event) => {
+    const value = String(event.currentTarget.value || "").replace(/[^0-9.]/g, "");
+    event.currentTarget.value = value;
   });
 
   document.getElementById("downloadCseAuthoritiesBtn")?.addEventListener("click", () => {
