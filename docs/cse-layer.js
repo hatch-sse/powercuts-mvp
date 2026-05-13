@@ -107,6 +107,12 @@ function cseVisibleCodes() {
   return new Set(cseVisibleRows().map((row) => row.local_authority_code));
 }
 
+function updateCampaignCountsAfterCseChange() {
+  if (typeof window.updateCampaignExportCounts === "function") {
+    window.updateCampaignExportCounts();
+  }
+}
+
 function updateCseSummary() {
   const summary = document.getElementById("cseSummary");
   if (!summary) return;
@@ -194,6 +200,7 @@ function drawCseLayer() {
 
   if (!cseState.enabled || !cseState.boundaries || !state.map) {
     updateCseSummary();
+    updateCampaignCountsAfterCseChange();
     return;
   }
 
@@ -226,6 +233,7 @@ function drawCseLayer() {
   if (!csePowercutOverlapEnabled() && state.layer) state.layer.bringToFront();
   if (!csePowercutOverlapEnabled() && state.licenceLayer) state.licenceLayer.bringToFront();
   updateCseSummary();
+  updateCampaignCountsAfterCseChange();
 }
 
 function cseCsvEscape(value) {
@@ -324,6 +332,7 @@ function setupCseControls() {
         console.error(error);
         const summary = document.getElementById("cseSummary");
         if (summary) summary.textContent = "Unable to load PSR CSE data files.";
+        updateCampaignCountsAfterCseChange();
         return;
       }
     }
@@ -353,6 +362,9 @@ function setupCseControls() {
 }
 
 (function initialiseCseLayer() {
+  window.cseVisibleRows = cseVisibleRows;
+  window.cseVisibleCodes = cseVisibleCodes;
+
   const originalUpdateAll = window.updateAll;
 
   if (typeof originalUpdateAll === "function") {
