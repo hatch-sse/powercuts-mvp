@@ -74,10 +74,36 @@ function cseColourFor(value, maxValue) {
   return `rgb(${r},${g},${b})`;
 }
 
+function selectedCouncilArea() {
+  return document.getElementById("cseCouncilSearch")?.value || "ALL";
+}
+
+function populateCouncilDropdown() {
+  const select = document.getElementById("cseCouncilSearch");
+  if (!select || select.dataset.loaded === "true") return;
+
+  const current = select.value || "ALL";
+  const rows = [...cseState.rowsByCode.values()].sort((a, b) =>
+    String(a.local_authority_name || "").localeCompare(String(b.local_authority_name || ""))
+  );
+
+  select.innerHTML = `<option value="ALL">All council areas</option>`;
+
+  for (const row of rows) {
+    const option = document.createElement("option");
+    option.value = row.local_authority_code;
+    option.textContent = row.local_authority_name;
+    select.appendChild(option);
+  }
+
+  select.value = rows.some((row) => row.local_authority_code === current) ? current : "ALL";
+  select.dataset.loaded = "true";
+}
+
 function cseVisibleRows() {
   const need = document.getElementById("cseNeedSelect")?.value || "overall";
   const threshold = document.getElementById("cseReachThreshold")?.value || "ALL";
-  const search = String(document.getElementById("cseCouncilSearch")?.value || "").trim().toLowerCase();
+  const selectedCouncil = selectedCouncilArea();
   const powercutOnly = document.getElementById("csePowercutOnly")?.checked || false;
   const sectors = state.currentSectors || [];
   const sectorAuthorityNames = new Set(
@@ -88,7 +114,7 @@ function cseVisibleRows() {
 
   return [...cseState.rowsByCode.values()].filter((row) => {
     if (!row?.needs?.[need]) return false;
-    if (search && !String(row.local_authority_name || "").toLowerCase().includes(search)) return false;
+    if (selectedCouncil !== "ALL" && row.local_authority_code !== selectedCouncil) return false;
     if (threshold !== "ALL" && cseNum(row.needs[need].psr_reach) > Number(threshold)) return false;
 
     // If the outage data does not carry local authority names yet, keep areas visible rather than hiding everything.
@@ -118,7 +144,7 @@ function updateCseSummary() {
   }
 
   const lowReach = rows.filter((row) => cseNum(row.needs?.[need]?.psr_reach) < 0.75).length;
-  summary.textContent = `${rows.length.toLocaleString("en-GB")} local authorities shown. ${lowReach.toLocaleString("en-GB")} have ${cseNeedLabels[need]} PSR reach below 75%. Current colour: ${cseMetricLabels[metric]}.`;
+  summary.textContent = `${rows.length.toLocaleString("en-GB")} council areas shown. ${lowReach.toLocaleString("en-GB")} have ${cseNeedLabels[need]} PSR reach below 75%. Current colour: ${cseMetricLabels[metric]}.`;
 }
 
 async function ensureCseDataLoaded() {
@@ -135,6 +161,7 @@ async function ensureCseDataLoaded() {
   cseState.boundaries = await boundaryResponse.json();
   const cseData = await dataResponse.json();
   cseState.rowsByCode = new Map((cseData.rows || []).map((row) => [row.local_authority_code, row]));
+  populateCouncilDropdown();
 }
 
 function showCseControls(show) {
@@ -152,7 +179,7 @@ function csePopupHtml(row) {
 
   return `
     <strong>${row.local_authority_name}</strong><br/>
-    Need group: ${cseNeedLabels[need]}<br/>
+    Needs group: ${cseNeedLabels[need]}<br/>
     ${cseMetricLabels[metric]}: ${cseMetricDisplay(values[metric])}<br/>
     PSR records: ${cseFmt(values.psr_records)}<br/>
     Eligibility estimate: ${cseFmt(values.eligibility_estimate)}<br/>
@@ -226,7 +253,7 @@ function buildCseAuthoritiesCsv() {
   const headers = [
     "local_authority_code",
     "local_authority_name",
-    "need_group",
+    "needs_group",
     "psr_records",
     "eligibility_estimate",
     "psr_reach",
@@ -260,7 +287,7 @@ function buildCseCampaignCsv() {
     "full_postcodes",
     "local_authority_code",
     "local_authority_name",
-    "need_group",
+    "needs_group",
     "psr_reach",
     "psr_records",
     "eligibility_estimate",
