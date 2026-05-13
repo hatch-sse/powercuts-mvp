@@ -34,28 +34,63 @@ function getVisibleCampaignSectors() {
   return getFilteredSectors();
 }
 
+function cseCampaignFilterEnabled() {
+  return Boolean(document.getElementById("cseToggle")?.checked) && typeof cseVisibleRows === "function";
+}
+
+function getVisibleCseAuthorityCodes() {
+  if (!cseCampaignFilterEnabled()) return null;
+  return new Set(cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
+}
+
+function campaignPostcodeDetails(row) {
+  if (Array.isArray(row.full_postcodes_detail) && row.full_postcodes_detail.length) {
+    return row.full_postcodes_detail;
+  }
+
+  return (row.full_postcodes || []).map((postcode) => ({
+    postcode,
+    postcode_sector: row.postcode_sector || "",
+    local_authority_code: row.local_authority_code || "",
+    local_authority_name: row.local_authority_name || "",
+  }));
+}
+
+function campaignSectorHasVisiblePostcodes(row, visibleCseCodes) {
+  if (!visibleCseCodes) return true;
+  return campaignPostcodeDetails(row).some((detail) => visibleCseCodes.has(detail.local_authority_code));
+}
+
 function getMetaSectors() {
+  const visibleCseCodes = getVisibleCseAuthorityCodes();
   return campaignUnique(
     getVisibleCampaignSectors()
+      .filter((row) => campaignSectorHasVisiblePostcodes(row, visibleCseCodes))
       .map((row) => String(row.postcode_sector || "").trim().toUpperCase())
   );
 }
 
 function getDoorDropRows() {
   const rowsByPostcode = new Map();
+  const visibleCseCodes = getVisibleCseAuthorityCodes();
 
   for (const row of getVisibleCampaignSectors()) {
-    const postcodes = campaignUnique(row.full_postcodes || []);
     const refs = campaignUnique(row.outage_refs || []);
+    const postcodeDetails = campaignPostcodeDetails(row);
 
-    for (const postcode of postcodes) {
-      const key = postcode.toUpperCase();
+    for (const detail of postcodeDetails) {
+      if (visibleCseCodes && !visibleCseCodes.has(detail.local_authority_code)) continue;
+
+      const key = String(detail.postcode || "").toUpperCase();
+      if (!key) continue;
 
       if (!rowsByPostcode.has(key)) {
         rowsByPostcode.set(key, {
           postcode: key,
-          postcode_sector: row.postcode_sector || "",
+          postcode_sector: detail.postcode_sector || row.postcode_sector || "",
           network: row.network || "",
+          local_authority_code: detail.local_authority_code || row.local_authority_code || "",
+          local_authority_name: detail.local_authority_name || row.local_authority_name || "",
           outage_types: new Set(),
           outage_refs: new Set(),
           outage_count: 0,
@@ -106,6 +141,8 @@ function buildDoorDropCsv() {
     "postcode",
     "postcode_sector",
     "network",
+    "local_authority_code",
+    "local_authority_name",
     "outage_types",
     "outage_refs",
     "outage_count",
@@ -128,13 +165,14 @@ function updateCampaignExportCounts() {
 
   const sectors = getMetaSectors();
   const postcodes = getDoorDropRows();
+  const cseText = cseCampaignFilterEnabled() ? " matching the PSR CSE filters" : "";
 
   if (metaCount) {
-    metaCount.textContent = `${sectors.length.toLocaleString("en-GB")} postcode sectors ready for Meta Ads.`;
+    metaCount.textContent = `${sectors.length.toLocaleString("en-GB")} postcode sectors${cseText} ready for Meta Ads.`;
   }
 
   if (doorDropCount) {
-    doorDropCount.textContent = `${postcodes.length.toLocaleString("en-GB")} full postcodes ready for door-drop planning.`;
+    doorDropCount.textContent = `${postcodes.length.toLocaleString("en-GB")} full postcodes${cseText} ready for door-drop planning.`;
   }
 }
 
