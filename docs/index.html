@@ -118,12 +118,25 @@
             </table>
           </div>
 
-          <h2>Meta export</h2>
-          <p id="metaCount" class="note">0 postcode sectors ready for Meta Ads.</p>
-          <button id="copyMetaBtn">Copy visible sectors for Meta</button>
-          <button id="downloadMetaBtn" class="secondary">Download sectors</button>
+          <h2>Campaign exports</h2>
+          <section class="detail-card export-card">
+            <h2>Meta sectors</h2>
+            <p id="metaCount" class="note">0 postcode sectors ready for Meta Ads.</p>
+            <button id="copyMetaBtn">Copy Meta sectors</button>
+            <button id="downloadMetaBtn" class="secondary">Download Meta TXT</button>
+            <button id="downloadMetaCsvBtn" class="secondary">Download Meta CSV</button>
+          </section>
+
+          <section class="detail-card export-card">
+            <h2>Door drop postcodes</h2>
+            <p id="doorDropCount" class="note">0 full postcodes ready for door-drop planning.</p>
+            <button id="copyDoorDropBtn">Copy full postcodes</button>
+            <button id="downloadDoorDropCsvBtn" class="secondary">Download door drop CSV</button>
+            <p class="note">Door-drop exports contain full postcodes linked to power interruption history. Use only for approved customer communications and campaign planning.</p>
+          </section>
+
           <button id="downloadCsvBtn" class="secondary">Download current table as CSV</button>
-          <textarea id="metaOutput" readonly placeholder="Postcode sectors will appear here after copying/exporting."></textarea>
+          <textarea id="metaOutput" readonly placeholder="Export outputs will appear here after copying/exporting."></textarea>
         </aside>
       </section>
     </section>
@@ -133,11 +146,12 @@
       <p id="dateRangeNote" class="note"></p>
       <p>Data is based on captured SSEN power interruption records and is designed for internal insight and campaign planning.</p>
       <p>Mapping is at postcode sector level, not full-postcode boundary level. Only sectors within SSEN SHEPD/SEPD licence areas are included.</p>
-      <p>Total time off supply is approximate and based on captured outage windows. Meta Ads targeting exports use postcode sectors because that is the practical targeting geography supported by the workflow.</p>
+      <p>Total time off supply is approximate and based on captured outage windows. Meta Ads targeting exports use postcode sectors because that is the practical targeting geography supported by the workflow. Door-drop exports use full postcodes from the same filtered power interruption records.</p>
     </details>
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="app.js?v=15"></script>
+  <script src="campaign-exports.js?v=1"></script>
   <script>
     // Some mobile browsers defer tile rendering during animated map zooms.
     // Dispatching a resize after map/table sector selection nudges Leaflet to redraw tiles.
