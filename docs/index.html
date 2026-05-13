@@ -99,21 +99,8 @@
             <option value="mental_health">Mental health</option>
           </select>
         </label>
-        <label class="cse-controls" hidden>CSE metric
-          <select id="cseMetricSelect">
-            <option value="psr_reach">PSR reach</option>
-            <option value="psr_records">PSR records</option>
-            <option value="eligibility_estimate">Eligibility estimate</option>
-          </select>
-        </label>
-        <label class="cse-controls" hidden>Maximum PSR reach
-          <select id="cseReachThreshold">
-            <option value="ALL">Any reach</option>
-            <option value="0.25">Under 25%</option>
-            <option value="0.5">Under 50%</option>
-            <option value="0.75">Under 75%</option>
-            <option value="1">Under 100%</option>
-          </select>
+        <label class="cse-controls" hidden>Maximum PSR reach %
+          <input id="cseReachThreshold" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="e.g. 75" />
         </label>
         <label class="cse-controls" hidden>Council area
           <select id="cseCouncilSearch">
@@ -122,7 +109,7 @@
         </label>
         <label class="toggle-label cse-controls" hidden>Power cut overlap
           <input type="checkbox" id="csePowercutOnly" />
-          <span>Only show areas with visible power cuts</span>
+          <span>Hide power cut layer</span>
         </label>
 
         <div class="filter-break" aria-hidden="true"></div>
@@ -209,7 +196,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="app.js?v=15"></script>
   <script src="campaign-exports.js?v=2"></script>
-  <script src="cse-layer.js?v=2"></script>
+  <script src="cse-layer.js?v=3"></script>
   <script>
     // Some mobile browsers defer tile rendering during animated map zooms.
     // Dispatching a resize after map/table sector selection nudges Leaflet to redraw tiles.
