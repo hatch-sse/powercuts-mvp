@@ -13,6 +13,8 @@ from db import get_connection, init_db
 ROOT = Path(__file__).resolve().parents[1]
 DASHBOARD_DATA = ROOT / "docs" / "data"
 SECTOR_BOUNDARIES_GEOJSON = ROOT / "data" / "mapping" / "ssen-postcode-sector-boundaries.geojson"
+LOCAL_AUTHORITY_BOUNDARIES_GEOJSON = DASHBOARD_DATA / "local-authorities-uk-2024-wgs84-web.geojson"
+CSE_LOCAL_AUTHORITY_JSON = DASHBOARD_DATA / "cse-local-authority-psr.json"
 
 VALID_NETWORKS = {"SHEPD", "SEPD"}
 ROLLING_DAYS = 365
@@ -59,33 +61,23 @@ def to_number(value: Any) -> float:
 
 def read_sector_boundaries() -> dict[str, dict[str, Any]]:
     if not SECTOR_BOUNDARIES_GEOJSON.exists():
-        raise RuntimeError(
-            f"Missing sector boundary file: {SECTOR_BOUNDARIES_GEOJSON}. "
-            "Add ssen-postcode-sector-boundaries.geojson to data/mapping/."
-        )
+        raise RuntimeError(f"Missing sector boundary file: {SECTOR_BOUNDARIES_GEOJSON}")
 
     data = json.loads(SECTOR_BOUNDARIES_GEOJSON.read_text(encoding="utf-8"))
-    features = data.get("features", [])
-
-    if not isinstance(features, list):
-        raise RuntimeError("Sector boundary GeoJSON does not contain a features array")
-
     boundaries: dict[str, dict[str, Any]] = {}
 
-    for feature in features:
+    for feature in data.get("features", []):
         props = feature.get("properties", {})
         sector = normalise(props.get("postcode_sector"))
         boundary_network = normalise(props.get("network"))
         geometry = feature.get("geometry")
 
-        if not sector or boundary_network not in VALID_NETWORKS or not geometry:
-            continue
-
-        boundaries[sector] = {
-            "postcode_sector": sector,
-            "network": boundary_network,
-            "geometry": geometry,
-        }
+        if sector and boundary_network in VALID_NETWORKS and geometry:
+            boundaries[sector] = {
+                "postcode_sector": sector,
+                "network": boundary_network,
+                "geometry": geometry,
+            }
 
     if not boundaries:
         raise RuntimeError("No valid postcode sector boundaries found")
@@ -94,18 +86,95 @@ def read_sector_boundaries() -> dict[str, dict[str, Any]]:
     return boundaries
 
 
+def read_cse_authorities() -> dict[str, dict[str, str]]:
+    if not CSE_LOCAL_AUTHORITY_JSON.exists():
+        print(f"CSE local authority data not found: {CSE_LOCAL_AUTHORITY_JSON}")
+        return {}
+
+    data = json.loads(CSE_LOCAL_AUTHORITY_JSON.read_text(encoding="utf-8"))
+    rows = data.get("rows", [])
+    authorities = {
+        str(row.get("local_authority_code") or ""): {
+            "local_authority_code": str(row.get("local_authority_code") or ""),
+            "local_authority_name": str(row.get("local_authority_name") or ""),
+        }
+        for row in rows
+        if row.get("local_authority_code") and row.get("local_authority_name")
+    }
+    print(f"Loaded {len(authorities)} CSE local authority rows")
+    return authorities
+
+
+def build_sector_local_authority_lookup(boundaries: dict[str, dict[str, Any]]) -> dict[str, dict[str, str]]:
+    if not LOCAL_AUTHORITY_BOUNDARIES_GEOJSON.exists():
+        print(f"Local authority boundary data not found: {LOCAL_AUTHORITY_BOUNDARIES_GEOJSON}")
+        return {}
+
+    cse_authorities = read_cse_authorities()
+    if not cse_authorities:
+        return {}
+
+    local_authority_data = json.loads(LOCAL_AUTHORITY_BOUNDARIES_GEOJSON.read_text(encoding="utf-8"))
+    local_authorities = []
+
+    for feature in local_authority_data.get("features", []):
+        props = feature.get("properties", {})
+        code = str(props.get("LAD24CD") or "")
+        if code not in cse_authorities:
+            continue
+        try:
+            geometry = shape(feature.get("geometry"))
+            if not geometry.is_valid:
+                geometry = geometry.buffer(0)
+        except Exception:
+            continue
+        if not geometry.is_empty:
+            local_authorities.append((code, cse_authorities[code]["local_authority_name"], geometry))
+
+    lookup: dict[str, dict[str, str]] = {}
+
+    for sector, boundary in boundaries.items():
+        try:
+            sector_geometry = shape(boundary["geometry"])
+            if not sector_geometry.is_valid:
+                sector_geometry = sector_geometry.buffer(0)
+        except Exception:
+            continue
+
+        best_code = ""
+        best_name = ""
+        best_area = 0.0
+
+        for code, name, local_authority_geometry in local_authorities:
+            if not sector_geometry.intersects(local_authority_geometry):
+                continue
+            area = sector_geometry.intersection(local_authority_geometry).area
+            if area > best_area:
+                best_code = code
+                best_name = name
+                best_area = area
+
+        if best_code:
+            lookup[sector] = {
+                "local_authority_code": best_code,
+                "local_authority_name": best_name,
+                "local_authority_match_method": "postcode_sector_largest_boundary_overlap",
+            }
+
+    print(f"Built local authority lookup for {len(lookup)} postcode sectors")
+    return lookup
+
+
 def exterior_lines_only(geometry: Any) -> MultiLineString:
     lines: list[LineString] = []
 
     if isinstance(geometry, Polygon):
         if not geometry.is_empty:
             lines.append(LineString(geometry.exterior.coords))
-
     elif isinstance(geometry, MultiPolygon):
         for polygon in geometry.geoms:
             if not polygon.is_empty:
                 lines.append(LineString(polygon.exterior.coords))
-
     elif hasattr(geometry, "geoms"):
         for part in geometry.geoms:
             lines.extend(exterior_lines_only(part).geoms)
@@ -136,17 +205,7 @@ def build_licence_boundary_overlay(boundaries: dict[str, dict[str, Any]]) -> lis
         unioned = unary_union(geoms)
         simplified = unioned.simplify(BOUNDARY_SIMPLIFY_TOLERANCE, preserve_topology=True)
         outline = exterior_lines_only(simplified)
-
-        overlays.append(
-            {
-                "type": "Feature",
-                "properties": {
-                    "network": network,
-                    "label": f"{network} licence area outer boundary",
-                },
-                "geometry": mapping(outline),
-            }
-        )
+        overlays.append({"type": "Feature", "properties": {"network": network, "label": f"{network} licence area outer boundary"}, "geometry": mapping(outline)})
 
     print(f"Built {len(overlays)} licence boundary overlays")
     return overlays
@@ -204,7 +263,6 @@ def fetch_rolling_events(cutoff: datetime) -> list[dict[str, Any]]:
 
         if first_seen and (not item["first_seen"] or first_seen < item["first_seen"]):
             item["first_seen"] = first_seen
-
         if last_seen and (not item["last_seen"] or last_seen > item["last_seen"]):
             item["last_seen"] = last_seen
 
@@ -221,20 +279,18 @@ def fetch_rolling_events(cutoff: datetime) -> list[dict[str, Any]]:
         if first_dt and last_dt and last_dt >= first_dt:
             duration_hours = round((last_dt - first_dt).total_seconds() / 3600, 2)
 
-        events.append(
-            {
-                "postcode_sector": value["postcode_sector"],
-                "network": value["network"],
-                "outage_id": value["outage_id"],
-                "postcodes": sorted(value["postcodes_set"]),
-                "outage_type": ",".join(sorted(value["outage_type_set"])),
-                "outage_count": 1,
-                "total_customers_affected": round(value["customers_affected"], 2),
-                "first_seen": value["first_seen"],
-                "last_seen": value["last_seen"],
-                "time_off_supply_hours_total_approx": duration_hours,
-            }
-        )
+        events.append({
+            "postcode_sector": value["postcode_sector"],
+            "network": value["network"],
+            "outage_id": value["outage_id"],
+            "postcodes": sorted(value["postcodes_set"]),
+            "outage_type": ",".join(sorted(value["outage_type_set"])),
+            "outage_count": 1,
+            "total_customers_affected": round(value["customers_affected"], 2),
+            "first_seen": value["first_seen"],
+            "last_seen": value["last_seen"],
+            "time_off_supply_hours_total_approx": duration_hours,
+        })
 
     events.sort(key=lambda r: (r["last_seen"], r["postcode_sector"], r["outage_id"]))
     return events
@@ -246,23 +302,43 @@ def filter_events_to_boundary(events: list[dict[str, Any]], boundaries: dict[str
     skipped_network_mismatch = 0
 
     for event in events:
-        sector = event["postcode_sector"]
-        network = event["network"]
-        boundary = boundaries.get(sector)
-
+        boundary = boundaries.get(event["postcode_sector"])
         if not boundary:
             skipped_missing_boundary += 1
             continue
-
-        if boundary["network"] != network:
+        if boundary["network"] != event["network"]:
             skipped_network_mismatch += 1
             continue
-
         filtered.append(event)
 
     print(f"Skipped {skipped_missing_boundary} events with no SSEN boundary")
     print(f"Skipped {skipped_network_mismatch} events where network did not match boundary")
     return filtered
+
+
+def enrich_events_with_local_authorities(events: list[dict[str, Any]], lookup: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
+    enriched = 0
+    for event in events:
+        match = lookup.get(event["postcode_sector"])
+        if not match:
+            event["postcodes_detail"] = [{"postcode": postcode, "postcode_sector": event["postcode_sector"]} for postcode in event.get("postcodes", [])]
+            continue
+
+        event.update(match)
+        event["postcodes_detail"] = [
+            {
+                "postcode": postcode,
+                "postcode_sector": event["postcode_sector"],
+                "local_authority_code": match["local_authority_code"],
+                "local_authority_name": match["local_authority_name"],
+                "local_authority_match_method": match["local_authority_match_method"],
+            }
+            for postcode in event.get("postcodes", [])
+        ]
+        enriched += 1
+
+    print(f"Enriched {enriched} events with local authority data")
+    return events
 
 
 def build_dashboard() -> None:
@@ -274,8 +350,10 @@ def build_dashboard() -> None:
 
     boundaries = read_sector_boundaries()
     licence_boundaries = build_licence_boundary_overlay(boundaries)
+    sector_local_authority_lookup = build_sector_local_authority_lookup(boundaries)
     events = fetch_rolling_events(cutoff)
     events = filter_events_to_boundary(events, boundaries)
+    events = enrich_events_with_local_authorities(events, sector_local_authority_lookup)
 
     used_sectors = {event["postcode_sector"] for event in events}
     boundary_rows = [boundaries[sector] for sector in sorted(used_sectors) if sector in boundaries]
@@ -291,12 +369,17 @@ def build_dashboard() -> None:
         "available_end": available_last[:10],
         "valid_networks": sorted(VALID_NETWORKS),
         "mapping_granularity": "postcode_sector",
+        "local_authority_mapping": {
+            "method": "postcode_sector_largest_boundary_overlap",
+            "note": "Existing full postcodes inherit the local authority assigned to their postcode sector. This can be replaced with full postcode-level matching if a postcode directory is added later.",
+        },
         "notes": [
             "Dashboard is mapped at postcode sector level.",
             "Only sectors within the official SSEN SHEPD/SEPD licence areas are included.",
             "Dashboard data is limited to a rolling 12-month window to keep the public site lightweight.",
             "Time off supply is approximate and based on captured outage windows.",
             "Licence boundary overlay is generated from the outer edge of the SSEN postcode sector boundary file.",
+            "Local authority matching is generated from postcode sector boundary overlap for campaign planning.",
         ],
         "boundaries": boundary_rows,
         "licence_boundaries": licence_boundaries,
