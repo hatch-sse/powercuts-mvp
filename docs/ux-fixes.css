@@ -34,6 +34,30 @@
   min-width: 170px;
 }
 
+.toggle-label {
+  align-items: center;
+  grid-auto-flow: column;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  min-height: 43px;
+  padding: 0 4px;
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #597c8f;
+}
+
+.toggle-label span {
+  font-weight: 700;
+  color: #c8d8e0;
+}
+
+.cse-controls[hidden] {
+  display: none !important;
+}
+
 /* Let the map fill the dashboard box, even when the right-hand panel is taller */
 .dashboard {
   align-items: stretch !important;
@@ -127,6 +151,11 @@ button.secondary:hover,
 
   .filter-card label:has(select) {
     min-width: 0;
+  }
+
+  .toggle-label {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr auto;
   }
 
   .map-wrap,
