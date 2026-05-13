@@ -34,14 +34,18 @@
   min-width: 170px;
 }
 
-/* Prevent the right panel from stretching the map taller than Leaflet has rendered */
+/* Let the map fill the dashboard box, even when the right-hand panel is taller */
 .dashboard {
-  align-items: start !important;
+  align-items: stretch !important;
 }
 
-.map-wrap,
+.map-wrap {
+  height: 100% !important;
+  min-height: 680px !important;
+}
+
 #map {
-  height: 680px !important;
+  height: 100% !important;
   min-height: 680px !important;
 }
 
