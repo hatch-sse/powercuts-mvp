@@ -97,6 +97,10 @@ function buildMetaCsv() {
   return [headers.join(","), ...rows].join("\n");
 }
 
+function buildDoorDropText() {
+  return getDoorDropRows().map((row) => row.postcode).join(", ");
+}
+
 function buildDoorDropCsv() {
   const headers = [
     "postcode",
@@ -140,10 +144,14 @@ function setupCampaignExportButtons() {
   });
 
   document.getElementById("copyDoorDropBtn")?.addEventListener("click", (event) => {
-    const text = getDoorDropRows().map((row) => row.postcode).join(", ");
+    const text = buildDoorDropText();
     const output = document.getElementById("metaOutput");
     if (output) output.value = text;
     campaignCopyText(text, event.currentTarget);
+  });
+
+  document.getElementById("downloadDoorDropTxtBtn")?.addEventListener("click", () => {
+    campaignDownloadText("door-drop-full-postcodes.txt", buildDoorDropText());
   });
 
   document.getElementById("downloadDoorDropCsvBtn")?.addEventListener("click", () => {
