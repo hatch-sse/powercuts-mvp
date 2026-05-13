@@ -35,12 +35,12 @@ function getVisibleCampaignSectors() {
 }
 
 function cseCampaignFilterEnabled() {
-  return Boolean(document.getElementById("cseToggle")?.checked) && typeof cseVisibleRows === "function";
+  return Boolean(document.getElementById("cseToggle")?.checked) && typeof window.cseVisibleRows === "function";
 }
 
 function getVisibleCseAuthorityCodes() {
   if (!cseCampaignFilterEnabled()) return null;
-  return new Set(cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
+  return new Set(window.cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
 }
 
 function campaignPostcodeDetails(row) {
@@ -198,6 +198,8 @@ function setupCampaignExportButtons() {
 }
 
 (function initialiseCampaignExports() {
+  window.updateCampaignExportCounts = updateCampaignExportCounts;
+
   const originalUpdateAll = window.updateAll;
 
   if (typeof originalUpdateAll === "function") {
