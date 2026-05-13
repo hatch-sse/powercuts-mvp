@@ -34,6 +34,29 @@
   min-width: 170px;
 }
 
+/* Keep campaign export buttons from overlapping or clipping on narrow panels */
+.export-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.export-card button,
+.panel > button {
+  width: 100%;
+  max-width: 100%;
+  min-height: 44px;
+  white-space: normal;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.export-card .note {
+  width: 100%;
+}
+
 @media (max-width: 980px) {
   .quick-ranges.inline-ranges {
     margin-left: 0;
