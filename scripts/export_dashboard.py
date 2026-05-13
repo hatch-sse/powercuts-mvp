@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import gzip
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -13,6 +15,7 @@ from db import get_connection, init_db
 ROOT = Path(__file__).resolve().parents[1]
 DASHBOARD_DATA = ROOT / "docs" / "data"
 SECTOR_BOUNDARIES_GEOJSON = ROOT / "data" / "mapping" / "ssen-postcode-sector-boundaries.geojson"
+POSTCODE_LA_LOOKUP_GZ = DASHBOARD_DATA / "postcode-local-authority-lookup-live-uk.csv.gz"
 LOCAL_AUTHORITY_BOUNDARIES_GEOJSON = DASHBOARD_DATA / "local-authorities-uk-2024-wgs84-web.geojson"
 CSE_LOCAL_AUTHORITY_JSON = DASHBOARD_DATA / "cse-local-authority-psr.json"
 
@@ -27,6 +30,10 @@ def normalise(value: Any) -> str:
 
 def normalise_postcode(value: Any) -> str:
     return " ".join(str(value or "").strip().upper().split())
+
+
+def compact_postcode(value: Any) -> str:
+    return "".join(str(value or "").upper().split())
 
 
 def iso_z(dt: datetime) -> str:
@@ -105,12 +112,40 @@ def read_cse_authorities() -> dict[str, dict[str, str]]:
     return authorities
 
 
-def build_sector_local_authority_lookup(boundaries: dict[str, dict[str, Any]]) -> dict[str, dict[str, str]]:
+def read_postcode_local_authority_lookup(cse_authorities: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+    if not POSTCODE_LA_LOOKUP_GZ.exists():
+        print(f"Postcode local authority lookup not found: {POSTCODE_LA_LOOKUP_GZ}")
+        return {}
+
+    lookup: dict[str, dict[str, str]] = {}
+
+    with gzip.open(POSTCODE_LA_LOOKUP_GZ, "rt", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            postcode = normalise_postcode(row.get("postcode"))
+            postcode_compact = compact_postcode(row.get("postcode_compact") or postcode)
+            code = str(row.get("local_authority_code") or "").strip()
+            if not postcode or not postcode_compact or not code:
+                continue
+            authority = cse_authorities.get(code, {})
+            lookup[postcode_compact] = {
+                "postcode": postcode,
+                "postcode_sector": row.get("postcode_sector") or postcode_to_sector(postcode),
+                "local_authority_code": code,
+                "local_authority_name": authority.get("local_authority_name", ""),
+                "local_authority_match_method": "full_postcode_lookup",
+            }
+
+    print(f"Loaded {len(lookup)} live postcode-to-local-authority lookup rows")
+    return lookup
+
+
+def build_sector_local_authority_lookup(boundaries: dict[str, dict[str, Any]], cse_authorities: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+    """Fallback only: assigns a postcode sector to the LA with the largest overlap."""
     if not LOCAL_AUTHORITY_BOUNDARIES_GEOJSON.exists():
         print(f"Local authority boundary data not found: {LOCAL_AUTHORITY_BOUNDARIES_GEOJSON}")
         return {}
 
-    cse_authorities = read_cse_authorities()
     if not cse_authorities:
         return {}
 
@@ -161,7 +196,7 @@ def build_sector_local_authority_lookup(boundaries: dict[str, dict[str, Any]]) -
                 "local_authority_match_method": "postcode_sector_largest_boundary_overlap",
             }
 
-    print(f"Built local authority lookup for {len(lookup)} postcode sectors")
+    print(f"Built fallback local authority lookup for {len(lookup)} postcode sectors")
     return lookup
 
 
@@ -316,28 +351,57 @@ def filter_events_to_boundary(events: list[dict[str, Any]], boundaries: dict[str
     return filtered
 
 
-def enrich_events_with_local_authorities(events: list[dict[str, Any]], lookup: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
-    enriched = 0
-    for event in events:
-        match = lookup.get(event["postcode_sector"])
-        if not match:
-            event["postcodes_detail"] = [{"postcode": postcode, "postcode_sector": event["postcode_sector"]} for postcode in event.get("postcodes", [])]
-            continue
+def enrich_events_with_local_authorities(
+    events: list[dict[str, Any]],
+    postcode_lookup: dict[str, dict[str, str]],
+    sector_lookup: dict[str, dict[str, str]],
+) -> list[dict[str, Any]]:
+    events_with_full_postcode_matches = 0
+    events_with_sector_fallback = 0
 
-        event.update(match)
-        event["postcodes_detail"] = [
-            {
+    for event in events:
+        postcode_details: list[dict[str, str]] = []
+        authority_codes: set[str] = set()
+        authority_names: set[str] = set()
+        methods: set[str] = set()
+        sector_match = sector_lookup.get(event["postcode_sector"])
+
+        for postcode in event.get("postcodes", []):
+            lookup_match = postcode_lookup.get(compact_postcode(postcode))
+            match = lookup_match or sector_match
+
+            detail = {
                 "postcode": postcode,
                 "postcode_sector": event["postcode_sector"],
-                "local_authority_code": match["local_authority_code"],
-                "local_authority_name": match["local_authority_name"],
-                "local_authority_match_method": match["local_authority_match_method"],
             }
-            for postcode in event.get("postcodes", [])
-        ]
-        enriched += 1
 
-    print(f"Enriched {enriched} events with local authority data")
+            if match:
+                detail.update({
+                    "local_authority_code": match.get("local_authority_code", ""),
+                    "local_authority_name": match.get("local_authority_name", ""),
+                    "local_authority_match_method": match.get("local_authority_match_method", ""),
+                })
+                if detail["local_authority_code"]:
+                    authority_codes.add(detail["local_authority_code"])
+                if detail["local_authority_name"]:
+                    authority_names.add(detail["local_authority_name"])
+                if detail["local_authority_match_method"]:
+                    methods.add(detail["local_authority_match_method"])
+
+            postcode_details.append(detail)
+
+        if any(detail.get("local_authority_match_method") == "full_postcode_lookup" for detail in postcode_details):
+            events_with_full_postcode_matches += 1
+        elif any(detail.get("local_authority_match_method") == "postcode_sector_largest_boundary_overlap" for detail in postcode_details):
+            events_with_sector_fallback += 1
+
+        event["local_authority_code"] = "; ".join(sorted(authority_codes))
+        event["local_authority_name"] = "; ".join(sorted(authority_names))
+        event["local_authority_match_method"] = "; ".join(sorted(methods))
+        event["postcodes_detail"] = postcode_details
+
+    print(f"Enriched {events_with_full_postcode_matches} events using full postcode lookup")
+    print(f"Enriched {events_with_sector_fallback} events using sector fallback")
     return events
 
 
@@ -350,10 +414,12 @@ def build_dashboard() -> None:
 
     boundaries = read_sector_boundaries()
     licence_boundaries = build_licence_boundary_overlay(boundaries)
-    sector_local_authority_lookup = build_sector_local_authority_lookup(boundaries)
+    cse_authorities = read_cse_authorities()
+    postcode_lookup = read_postcode_local_authority_lookup(cse_authorities)
+    sector_local_authority_lookup = build_sector_local_authority_lookup(boundaries, cse_authorities)
     events = fetch_rolling_events(cutoff)
     events = filter_events_to_boundary(events, boundaries)
-    events = enrich_events_with_local_authorities(events, sector_local_authority_lookup)
+    events = enrich_events_with_local_authorities(events, postcode_lookup, sector_local_authority_lookup)
 
     used_sectors = {event["postcode_sector"] for event in events}
     boundary_rows = [boundaries[sector] for sector in sorted(used_sectors) if sector in boundaries]
@@ -370,8 +436,9 @@ def build_dashboard() -> None:
         "valid_networks": sorted(VALID_NETWORKS),
         "mapping_granularity": "postcode_sector",
         "local_authority_mapping": {
-            "method": "postcode_sector_largest_boundary_overlap",
-            "note": "Existing full postcodes inherit the local authority assigned to their postcode sector. This can be replaced with full postcode-level matching if a postcode directory is added later.",
+            "method": "full_postcode_lookup_with_sector_fallback",
+            "postcode_lookup_file": "postcode-local-authority-lookup-live-uk.csv.gz",
+            "note": "Full postcodes are matched to local authority using the ONSPD lookup. If a postcode is missing from the lookup, the postcode sector boundary overlap fallback is used.",
         },
         "notes": [
             "Dashboard is mapped at postcode sector level.",
@@ -379,7 +446,7 @@ def build_dashboard() -> None:
             "Dashboard data is limited to a rolling 12-month window to keep the public site lightweight.",
             "Time off supply is approximate and based on captured outage windows.",
             "Licence boundary overlay is generated from the outer edge of the SSEN postcode sector boundary file.",
-            "Local authority matching is generated from postcode sector boundary overlap for campaign planning.",
+            "Local authority matching uses the ONSPD full postcode lookup where possible, with postcode sector boundary overlap as a fallback.",
         ],
         "boundaries": boundary_rows,
         "licence_boundaries": licence_boundaries,
