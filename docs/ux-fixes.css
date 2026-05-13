@@ -34,6 +34,41 @@
   min-width: 170px;
 }
 
+/* Prevent the right panel from stretching the map taller than Leaflet has rendered */
+.dashboard {
+  align-items: start !important;
+}
+
+.map-wrap,
+#map {
+  height: 680px !important;
+  min-height: 680px !important;
+}
+
+/* Button colours */
+button,
+button.secondary,
+.export-card button,
+.panel > button,
+.lookup-controls button,
+.quick-ranges button {
+  background: #597c8f !important;
+  color: #ffffff !important;
+  border: 1px solid #597c8f !important;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+button:hover,
+button.secondary:hover,
+.export-card button:hover,
+.panel > button:hover,
+.lookup-controls button:hover,
+.quick-ranges button:hover {
+  background: #ffffff !important;
+  color: #293745 !important;
+  border-color: #ffffff !important;
+}
+
 /* Keep campaign export buttons from overlapping or clipping on narrow panels */
 .export-card {
   display: flex;
@@ -65,6 +100,12 @@
   .lookup-controls {
     grid-template-columns: 1fr auto;
   }
+
+  .map-wrap,
+  #map {
+    height: 520px !important;
+    min-height: 520px !important;
+  }
 }
 
 @media (max-width: 640px) {
@@ -82,5 +123,11 @@
 
   .filter-card label:has(select) {
     min-width: 0;
+  }
+
+  .map-wrap,
+  #map {
+    height: 430px !important;
+    min-height: 430px !important;
   }
 }
