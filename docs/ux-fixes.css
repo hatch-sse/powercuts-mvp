@@ -34,6 +34,18 @@
   min-width: 170px;
 }
 
+/* Keep native browser date pickers visible/clickable */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: block;
+  opacity: 1;
+  cursor: pointer;
+  filter: invert(1);
+}
+
 .toggle-label {
   align-items: center;
   grid-auto-flow: column;
@@ -151,6 +163,11 @@ button.secondary:hover,
 
   .filter-card label:has(select) {
     min-width: 0;
+  }
+
+  input[type="date"] {
+    -webkit-appearance: auto;
+    appearance: auto;
   }
 
   .toggle-label {
