@@ -8,21 +8,36 @@ function cseSectorFilterIsEnabled() {
 
 function cseSectorVisibleAuthorityCodes() {
   if (!cseSectorFilterIsEnabled()) return null;
-  return new Set(window.cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
+  const codes = new Set(window.cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
+  return codes.size ? codes : null;
+}
+
+function cseSectorRowAuthorityCodes(row) {
+  const codes = new Set();
+  const details = Array.isArray(row.full_postcodes_detail) ? row.full_postcodes_detail : [];
+
+  for (const detail of details) {
+    if (detail.local_authority_code) codes.add(detail.local_authority_code);
+  }
+
+  String(row.local_authority_code || "")
+    .split(";")
+    .map((code) => code.trim())
+    .filter(Boolean)
+    .forEach((code) => codes.add(code));
+
+  return codes;
+}
+
+function cseSectorRowsHaveAuthorityCodes(rows) {
+  return rows.some((row) => cseSectorRowAuthorityCodes(row).size > 0);
 }
 
 function cseSectorRowMatches(row, visibleAuthorityCodes) {
   if (!visibleAuthorityCodes) return true;
-
-  const details = Array.isArray(row.full_postcodes_detail) ? row.full_postcodes_detail : [];
-  if (details.length) {
-    return details.some((detail) => visibleAuthorityCodes.has(detail.local_authority_code));
-  }
-
-  return String(row.local_authority_code || "")
-    .split(";")
-    .map((code) => code.trim())
-    .some((code) => visibleAuthorityCodes.has(code));
+  const rowCodes = cseSectorRowAuthorityCodes(row);
+  if (!rowCodes.size) return false;
+  return [...rowCodes].some((code) => visibleAuthorityCodes.has(code));
 }
 
 (function initialiseCseSectorFiltering() {
@@ -32,7 +47,13 @@ function cseSectorRowMatches(row, visibleAuthorityCodes) {
     window.getFilteredSectors = function cseAwareGetFilteredSectors() {
       const rows = originalGetFilteredSectors();
       const visibleAuthorityCodes = cseSectorVisibleAuthorityCodes();
+
       if (!visibleAuthorityCodes) return rows;
+
+      // Older cached dashboard JSON may not yet contain local_authority_code on outage postcodes.
+      // Do not blank the map in that case; the filter will activate once the refreshed dashboard data is deployed.
+      if (!cseSectorRowsHaveAuthorityCodes(rows)) return rows;
+
       return rows.filter((row) => cseSectorRowMatches(row, visibleAuthorityCodes));
     };
   }
