@@ -37,6 +37,16 @@ function csePct(value) {
   });
 }
 
+function cseEscapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[char]));
+}
+
 function cseReachThreshold() {
   const input = document.getElementById("cseReachThreshold");
   const raw = String(input?.value || "").trim();
@@ -181,12 +191,12 @@ function csePopupHtml(row) {
   const overall = row.needs?.overall || {};
 
   return `
-    <strong>${row.local_authority_name}</strong><br/>
-    Needs group: ${cseNeedLabels[need]}<br/>
-    PSR reach: ${cseMetricDisplay(values.psr_reach)}<br/>
-    PSR records: ${cseFmt(values.psr_records)}<br/>
-    Eligibility estimate: ${cseFmt(values.eligibility_estimate)}<br/>
-    <br/>Overall PSR reach: ${csePct(overall.psr_reach)}
+    <strong>${cseEscapeHtml(row.local_authority_name)}</strong><br/>
+    Needs group: ${cseEscapeHtml(cseNeedLabels[need])}<br/>
+    PSR reach: ${cseEscapeHtml(cseMetricDisplay(values.psr_reach))}<br/>
+    PSR records: ${cseEscapeHtml(cseFmt(values.psr_records))}<br/>
+    Eligibility estimate: ${cseEscapeHtml(cseFmt(values.eligibility_estimate))}<br/>
+    <br/>Overall PSR reach: ${cseEscapeHtml(csePct(overall.psr_reach))}
   `;
 }
 
@@ -280,10 +290,27 @@ function buildCseAuthoritiesCsv() {
   return [headers.join(","), ...rows].join("\n");
 }
 
+function sectorAuthorityCodes(sector) {
+  const codes = new Set();
+  if (Array.isArray(sector.full_postcodes_detail)) {
+    for (const detail of sector.full_postcodes_detail) {
+      if (detail?.local_authority_code) codes.add(detail.local_authority_code);
+    }
+  }
+  if (sector.local_authority_code) {
+    String(sector.local_authority_code)
+      .split(";")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .forEach((value) => codes.add(value));
+  }
+  return [...codes].sort();
+}
+
 function buildCseCampaignCsv() {
   const need = document.getElementById("cseNeedSelect")?.value || "overall";
   const rowsBySector = state.currentSectors || [];
-  const cseRows = cseVisibleRows();
+  const visibleCseRowsByCode = new Map(cseVisibleRows().map((row) => [row.local_authority_code, row]));
   const headers = [
     "postcode_sector",
     "network",
@@ -300,7 +327,9 @@ function buildCseCampaignCsv() {
   const rows = [];
 
   for (const sector of rowsBySector) {
-    for (const cseRow of cseRows) {
+    for (const authorityCode of sectorAuthorityCodes(sector)) {
+      const cseRow = visibleCseRowsByCode.get(authorityCode);
+      if (!cseRow) continue;
       const values = cseRow.needs?.[need] || {};
       rows.push([
         sector.postcode_sector,
