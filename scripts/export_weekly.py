@@ -31,16 +31,32 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
                 op.outage_id AS outage_id,
                 COALESCE(o.outage_type, '') AS outage_type,
                 COALESCE(o.customers_affected, 0) AS customers_affected,
-                MIN(op.first_seen_utc) AS outage_first_seen,
-                MAX(op.last_seen_utc) AS outage_last_seen,
+                CASE
+                    WHEN MIN(op.first_seen_utc) < ? THEN ?
+                    ELSE MIN(op.first_seen_utc)
+                END AS outage_first_seen,
+                CASE
+                    WHEN MAX(op.last_seen_utc) > ? THEN ?
+                    ELSE MAX(op.last_seen_utc)
+                END AS outage_last_seen,
                 ROUND(
-                    (julianday(MAX(op.last_seen_utc)) - julianday(MIN(op.first_seen_utc))) * 24,
+                    (julianday(
+                        CASE
+                            WHEN MAX(op.last_seen_utc) > ? THEN ?
+                            ELSE MAX(op.last_seen_utc)
+                        END
+                    ) - julianday(
+                        CASE
+                            WHEN MIN(op.first_seen_utc) < ? THEN ?
+                            ELSE MIN(op.first_seen_utc)
+                        END
+                    )) * 24,
                     2
                 ) AS outage_duration_hours_approx
             FROM outage_postcodes op
             JOIN outages o
               ON o.outage_id = op.outage_id
-            WHERE op.first_seen_utc <= ?
+            WHERE op.first_seen_utc < ?
               AND op.last_seen_utc >= ?
             GROUP BY op.postcode, COALESCE(o.network, ''), op.outage_id
         )
@@ -59,8 +75,14 @@ def export_for_window(start: datetime, end: datetime) -> tuple[Path, int]:
         ORDER BY time_off_supply_hours_total_approx DESC, outage_count DESC, postcode ASC
     """
 
+    start_iso = iso_z(start)
+    end_iso = iso_z(end)
+
     with get_connection() as conn:
-        rows = conn.execute(query, (iso_z(end), iso_z(start))).fetchall()
+        rows = conn.execute(
+            query,
+            (start_iso, start_iso, end_iso, end_iso, end_iso, end_iso, start_iso, start_iso, end_iso, start_iso),
+        ).fetchall()
 
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)

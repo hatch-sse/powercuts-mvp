@@ -86,10 +86,18 @@ def export_period(start: datetime, end: datetime, output_path: Path) -> int:
                 op.outage_id AS outage_id,
                 COALESCE(o.outage_type, '') AS outage_type,
                 COALESCE(o.customers_affected, 0) AS customers_affected,
-                MIN(op.first_seen_utc) AS outage_first_seen,
-                MAX(op.last_seen_utc) AS outage_last_seen,
                 ROUND(
-                    (julianday(MAX(op.last_seen_utc)) - julianday(MIN(op.first_seen_utc))) * 24,
+                    (julianday(
+                        CASE
+                            WHEN MAX(op.last_seen_utc) > ? THEN ?
+                            ELSE MAX(op.last_seen_utc)
+                        END
+                    ) - julianday(
+                        CASE
+                            WHEN MIN(op.first_seen_utc) < ? THEN ?
+                            ELSE MIN(op.first_seen_utc)
+                        END
+                    )) * 24,
                     2
                 ) AS outage_duration_hours_approx
             FROM outage_postcodes op
@@ -111,8 +119,14 @@ def export_period(start: datetime, end: datetime, output_path: Path) -> int:
         ORDER BY time_off_supply_hours_total_approx DESC, outage_count DESC, postcode ASC
     """
 
+    start_iso = iso_z(start)
+    end_iso = iso_z(end)
+
     with get_connection() as conn:
-        raw_rows = conn.execute(query, (iso_z(end), iso_z(start))).fetchall()
+        raw_rows = conn.execute(
+            query,
+            (end_iso, end_iso, start_iso, start_iso, end_iso, start_iso),
+        ).fetchall()
 
     sector_rows = {}
     for row in raw_rows:

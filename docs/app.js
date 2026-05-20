@@ -37,6 +37,16 @@ function fmtHours(value) {
   return num(value).toLocaleString("en-GB", { maximumFractionDigits: 1 });
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[char]));
+}
+
 function selectedNetwork() {
   return document.getElementById("networkSelect").value;
 }
@@ -71,7 +81,7 @@ function hideSearchResult() {
   const result = document.getElementById("postcodeResult");
   if (result) {
     result.hidden = true;
-    result.innerHTML = "";
+    result.textContent = "";
   }
 }
 
@@ -367,17 +377,21 @@ function updateTable() {
   document.getElementById("legendTitle").textContent = metricLabels[metric];
 
   const tbody = document.getElementById("topTable");
-  tbody.innerHTML = "";
+  tbody.textContent = "";
 
   for (const row of rows) {
     const tr = document.createElement("tr");
     tr.className = "clickable-row";
     tr.title = `Zoom to ${row.postcode_sector}`;
-    tr.innerHTML = `
-      <td>${row.postcode_sector}</td>
-      <td>${row.network || "–"}</td>
-      <td>${metric === "time_off_supply_hours_total_approx" ? fmtHours(row[metric]) : fmt(row[metric])}</td>
-    `;
+
+    const sectorCell = document.createElement("td");
+    sectorCell.textContent = row.postcode_sector || "–";
+    const networkCell = document.createElement("td");
+    networkCell.textContent = row.network || "–";
+    const metricCell = document.createElement("td");
+    metricCell.textContent = metric === "time_off_supply_hours_total_approx" ? fmtHours(row[metric]) : fmt(row[metric]);
+
+    tr.append(sectorCell, networkCell, metricCell);
     tr.addEventListener("click", () => selectSector(row));
     tbody.appendChild(tr);
   }
@@ -387,21 +401,21 @@ function showSectorDetail(row) {
   const postcodes = row.full_postcodes || [];
   const refs = row.outage_refs || [];
   document.getElementById("sectorDetail").innerHTML = `
-    <strong>${row.postcode_sector}</strong><br/>
-    Network: ${row.network || "–"}<br/>
-    Council area: ${row.local_authority_name || "–"}<br/>
-    Power cut type: ${row.outage_type || "–"}<br/>
-    Outages: ${fmt(row.outage_count)}<br/>
-    Customers affected: ${fmt(row.total_customers_affected)}<br/>
-    Total time off supply: ${fmtHours(row.time_off_supply_hours_total_approx)} hrs<br/>
-    First outage in period: ${formatDateTimeUK(row.first_seen)}<br/>
-    Most recent outage: ${formatDateTimeUK(row.last_seen)}<br/>
-    Meta targeting sector: ${row.postcode_sector}<br/>
-    <br/><strong>Power cut references (${fmt(refs.length)})</strong><br/>
-    <span class="wrap-list">${truncateList(refs)}</span><br/>
+    <strong>${escapeHtml(row.postcode_sector)}</strong><br/>
+    Network: ${escapeHtml(row.network || "–")}<br/>
+    Council area: ${escapeHtml(row.local_authority_name || "–")}<br/>
+    Power cut type: ${escapeHtml(row.outage_type || "–")}<br/>
+    Outages: ${escapeHtml(fmt(row.outage_count))}<br/>
+    Customers affected: ${escapeHtml(fmt(row.total_customers_affected))}<br/>
+    Total time off supply: ${escapeHtml(fmtHours(row.time_off_supply_hours_total_approx))} hrs<br/>
+    First outage in period: ${escapeHtml(formatDateTimeUK(row.first_seen))}<br/>
+    Most recent outage: ${escapeHtml(formatDateTimeUK(row.last_seen))}<br/>
+    Meta targeting sector: ${escapeHtml(row.postcode_sector)}<br/>
+    <br/><strong>Power cut references (${escapeHtml(fmt(refs.length))})</strong><br/>
+    <span class="wrap-list">${escapeHtml(truncateList(refs))}</span><br/>
     <button class="secondary small inline-copy" id="copyRefsBtn">Copy references</button><br/>
-    <br/><strong>Full postcodes recorded (${fmt(postcodes.length)})</strong><br/>
-    <span class="wrap-list">${truncateList(postcodes)}</span><br/>
+    <br/><strong>Full postcodes recorded (${escapeHtml(fmt(postcodes.length))})</strong><br/>
+    <span class="wrap-list">${escapeHtml(truncateList(postcodes))}</span><br/>
     <button class="secondary small inline-copy" id="copyPostcodesBtn">Copy full postcodes</button>
   `;
 
@@ -460,7 +474,7 @@ function updateMap() {
       style: { color: "#003865", weight: 0.9, fillColor: colour, fillOpacity: 0.75 },
       onEachFeature: function (_, leafletLayer) {
         leafletLayer.on("click", () => showSectorDetail(row));
-        leafletLayer.bindPopup(`<strong>${row.postcode_sector}</strong><br/>${metricLabels[metric]}: ${metric === "time_off_supply_hours_total_approx" ? fmtHours(row[metric]) : fmt(row[metric])}`);
+        leafletLayer.bindPopup(`<strong>${escapeHtml(row.postcode_sector)}</strong><br/>${escapeHtml(metricLabels[metric])}: ${escapeHtml(metric === "time_off_supply_hours_total_approx" ? fmtHours(row[metric]) : fmt(row[metric]))}`);
       },
     });
     state.sectorLayerByKey.set(sectorKey(row), layer);
@@ -577,7 +591,7 @@ function handleSearch() {
   const matchedEvents = events.filter((event) => eventMatchesSearch(event, raw));
 
   if (!matchedEvents.length) {
-    result.innerHTML = `<strong>${raw.toUpperCase()}</strong><br/>No matching outage history found in the selected date range, network and power cut type filters.`;
+    result.innerHTML = `<strong>${escapeHtml(raw.toUpperCase())}</strong><br/>No matching outage history found in the selected date range, network and power cut type filters.`;
     return;
   }
 
@@ -587,16 +601,16 @@ function handleSearch() {
   const sectors = [...new Set(matchedEvents.map((event) => event.postcode_sector).filter(Boolean))].sort();
 
   result.innerHTML = `
-    <strong>${raw.toUpperCase()}</strong><br/>
+    <strong>${escapeHtml(raw.toUpperCase())}</strong><br/>
     ${hasExact ? "Exact postcode match found." : "Matched by postcode, postcode sector, partial postcode, or power cut reference."}<br/>
-    Matching sectors: ${truncateList(sectors, 30)}<br/>
-    Network: ${summary.networks}<br/>
-    Power cut type: ${summary.outageTypes}<br/>
-    Outages: ${fmt(summary.outageCount)}<br/>
-    Customers affected: ${fmt(summary.customers)}<br/>
-    Approx. total time off supply: ${fmtHours(summary.hours)} hrs<br/>
-    Power cut references (${fmt(summary.refs.length)}): <span class="wrap-list">${truncateList(summary.refs, 50)}</span><br/>
-    Full postcodes recorded (${fmt(summary.postcodes.length)}): <span class="wrap-list">${truncateList(summary.postcodes, 80)}</span><br/>
+    Matching sectors: ${escapeHtml(truncateList(sectors, 30))}<br/>
+    Network: ${escapeHtml(summary.networks)}<br/>
+    Power cut type: ${escapeHtml(summary.outageTypes)}<br/>
+    Outages: ${escapeHtml(fmt(summary.outageCount))}<br/>
+    Customers affected: ${escapeHtml(fmt(summary.customers))}<br/>
+    Approx. total time off supply: ${escapeHtml(fmtHours(summary.hours))} hrs<br/>
+    Power cut references (${escapeHtml(fmt(summary.refs.length))}): <span class="wrap-list">${escapeHtml(truncateList(summary.refs, 50))}</span><br/>
+    Full postcodes recorded (${escapeHtml(fmt(summary.postcodes.length))}): <span class="wrap-list">${escapeHtml(truncateList(summary.postcodes, 80))}</span><br/>
     <button class="secondary small inline-copy" id="copySearchRefsBtn">Copy references</button>
     <button class="secondary small inline-copy" id="copySearchPostcodesBtn">Copy full postcodes</button>
   `;
