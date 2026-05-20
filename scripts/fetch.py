@@ -84,8 +84,8 @@ def fetch_json(url: str) -> list[dict[str, Any]]:
         raise RuntimeError("Response was not valid JSON") from exc
 
 
-def upsert_outage(conn: Any, outage: dict[str, Any], now_iso: str) -> str:
-    outage_id = str(
+def get_outage_id(outage: dict[str, Any]) -> str:
+    return str(
         outage.get("reference")
         or outage.get("jobID")
         or outage.get("id")
@@ -93,6 +93,10 @@ def upsert_outage(conn: Any, outage: dict[str, Any], now_iso: str) -> str:
         or outage.get("faultId")
         or ""
     ).strip()
+
+
+def upsert_outage(conn: Any, outage: dict[str, Any], now_iso: str) -> str:
+    outage_id = get_outage_id(outage)
 
     if not outage_id:
         raw_name = str(outage.get("name") or "unknown")
@@ -208,6 +212,29 @@ def upsert_outage_postcode(conn: Any, outage_id: str, postcode: str, now_iso: st
     )
 
 
+def mark_missing_outages_resolved(conn: Any, current_outage_ids: set[str], now_iso: str) -> int:
+    active_rows = conn.execute(
+        "SELECT outage_id FROM outages WHERE COALESCE(resolved, 0) = 0"
+    ).fetchall()
+    stale_ids = sorted({row["outage_id"] for row in active_rows} - current_outage_ids)
+    if not stale_ids:
+        return 0
+
+    conn.executemany(
+        """
+        UPDATE outages
+        SET resolved = 1,
+            last_seen_utc = CASE
+                WHEN last_seen_utc IS NULL OR last_seen_utc > ? THEN ?
+                ELSE last_seen_utc
+            END
+        WHERE outage_id = ?
+        """,
+        [(now_iso, now_iso, outage_id) for outage_id in stale_ids],
+    )
+    return len(stale_ids)
+
+
 def insert_snapshot(conn: Any, fetched_at_utc: str, outage_count: int, source_url: str) -> None:
     conn.execute(
         """
@@ -235,16 +262,21 @@ def main() -> int:
         insert_snapshot(conn, now_iso, len(outages), SOURCE_URL)
 
         postcode_rows = 0
+        current_outage_ids: set[str] = set()
         for outage in outages:
             outage_id = upsert_outage(conn, outage, now_iso)
+            current_outage_ids.add(outage_id)
             for postcode in extract_postcodes(outage):
                 upsert_outage_postcode(conn, outage_id, postcode, now_iso)
                 postcode_rows += 1
+
+        stale_count = mark_missing_outages_resolved(conn, current_outage_ids, now_iso)
 
         conn.commit()
         conn.close()
 
         print(f"Stored {len(outages)} outages and {postcode_rows} outage-postcode rows")
+        print(f"Marked {stale_count} previously active outages as resolved/stale")
         return 0
 
     except Exception as exc:
