@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+
+# Local environment
+.env
+.env.*
+
+# Local runtime data
+*.sqlite
+*.db
+
+# Node tooling
+node_modules/
