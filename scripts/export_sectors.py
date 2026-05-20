@@ -79,7 +79,7 @@ def write_rows_to_csv(path: Path, rows) -> int:
 
 def export_period(start: datetime, end: datetime, output_path: Path) -> int:
     query = """
-        WITH outage_sector_durations AS (
+        WITH postcode_outage AS (
             SELECT
                 op.postcode AS postcode,
                 COALESCE(o.network, '') AS network,
@@ -110,13 +110,12 @@ def export_period(start: datetime, end: datetime, output_path: Path) -> int:
         SELECT
             postcode,
             network,
-            GROUP_CONCAT(DISTINCT outage_type) AS outage_type,
-            COUNT(DISTINCT outage_id) AS outage_count,
-            COALESCE(SUM(customers_affected), 0) AS total_customers_affected,
-            ROUND(SUM(outage_duration_hours_approx), 2) AS time_off_supply_hours_total_approx
-        FROM outage_sector_durations
-        GROUP BY postcode, network
-        ORDER BY time_off_supply_hours_total_approx DESC, outage_count DESC, postcode ASC
+            outage_id,
+            outage_type,
+            customers_affected,
+            outage_duration_hours_approx
+        FROM postcode_outage
+        ORDER BY outage_duration_hours_approx DESC, outage_id ASC, postcode ASC
     """
 
     start_iso = iso_z(start)
@@ -129,12 +128,14 @@ def export_period(start: datetime, end: datetime, output_path: Path) -> int:
         ).fetchall()
 
     sector_rows = {}
+    seen_outage_ids_by_sector = {}
     for row in raw_rows:
         sector = postcode_to_sector(row["postcode"])
         if not sector:
             continue
 
         key = (sector, row["network"])
+        outage_key = (key, row["outage_id"])
         if key not in sector_rows:
             sector_rows[key] = {
                 "postcode_sector": sector,
@@ -144,12 +145,15 @@ def export_period(start: datetime, end: datetime, output_path: Path) -> int:
                 "total_customers_affected": 0,
                 "time_off_supply_hours_total_approx": 0.0,
             }
+            seen_outage_ids_by_sector[key] = set()
 
-        sector_rows[key]["outage_count"] += int(row["outage_count"] or 0)
-        sector_rows[key]["total_customers_affected"] += int(row["total_customers_affected"] or 0)
-        sector_rows[key]["time_off_supply_hours_total_approx"] += float(
-            row["time_off_supply_hours_total_approx"] or 0.0
-        )
+        if row["outage_id"] not in seen_outage_ids_by_sector[key]:
+            seen_outage_ids_by_sector[key].add(row["outage_id"])
+            sector_rows[key]["outage_count"] += 1
+            sector_rows[key]["total_customers_affected"] += int(row["customers_affected"] or 0)
+            sector_rows[key]["time_off_supply_hours_total_approx"] += float(
+                row["outage_duration_hours_approx"] or 0.0
+            )
 
         if row["outage_type"]:
             for part in str(row["outage_type"]).split(","):
