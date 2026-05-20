@@ -213,6 +213,10 @@ def upsert_outage_postcode(conn: Any, outage_id: str, postcode: str, now_iso: st
 
 
 def mark_missing_outages_resolved(conn: Any, current_outage_ids: set[str], now_iso: str) -> int:
+    if not current_outage_ids:
+        print("Skipping stale outage resolution because the latest feed contained no usable outage IDs")
+        return 0
+
     active_rows = conn.execute(
         "SELECT outage_id FROM outages WHERE COALESCE(resolved, 0) = 0"
     ).fetchall()
