@@ -24,12 +24,20 @@ jobs:
         run: git pull --rebase
 
       - name: Restore outage database cache
+        id: outage_db_cache
         uses: actions/cache@v4
         with:
           path: data/powercuts.db
           key: powercuts-db-${{ github.run_id }}
           restore-keys: |
             powercuts-db-
+
+      - name: Seed outage database when cache is missing
+        if: steps.outage_db_cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p data
+          git show 728ebb3ba50ee7230c686d9663de8b52cfc30e4c:data/powercuts.db > data/powercuts.db
+          ls -lh data/powercuts.db
 
       - name: Set up Python
         uses: actions/setup-python@v5
