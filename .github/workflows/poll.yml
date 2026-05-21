@@ -2,9 +2,6 @@ name: Poll outages
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   schedule:
     - cron: "3,13,23,33,43,53 * * * *"
 
@@ -22,6 +19,9 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
+
+      - name: Sync branch before generating data
+        run: git pull --rebase
 
       - name: Restore outage database cache
         uses: actions/cache@v4
@@ -68,13 +68,13 @@ jobs:
 
       - name: Commit dashboard data
         run: |
-          git pull --rebase
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/
           if ! git diff --cached --quiet; then
             git commit -m "Update outage dashboard"
             for i in 1 2 3; do
+              git pull --rebase --autostash
               git push && break
               echo "Push failed, retrying in 10 seconds..."
               sleep 10
@@ -84,13 +84,13 @@ jobs:
       - name: Commit daily exports
         if: steps.commit_scope.outputs.commit_exports == 'true'
         run: |
-          git pull --rebase
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/exports/
           if ! git diff --cached --quiet; then
             git commit -m "Update outage CSV exports"
             for i in 1 2 3; do
+              git pull --rebase --autostash
               git push && break
               echo "Push failed, retrying in 10 seconds..."
               sleep 10
