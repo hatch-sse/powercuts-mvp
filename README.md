@@ -31,6 +31,7 @@ The workflow commits updated SQLite and CSV files back into the repo automatical
 - Scheduled workflows run in UTC by default on GitHub Actions.
 - GitHub says schedules can be delayed under heavy load and only run from the default branch.
 - In public repos, scheduled workflows are automatically disabled after 60 days of inactivity.
+- The fetch step fails if the newest timestamp in the upstream outage feed is more than 24 hours old, so stale source data does not silently publish as a fresh dashboard update.
 
 ## Output
 
