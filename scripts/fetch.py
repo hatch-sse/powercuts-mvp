@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -12,10 +12,84 @@ from db import get_connection, init_db
 SOURCE_URL = "https://raw.githubusercontent.com/robintw/sse_powercuts/master/outages.json"
 USER_AGENT = "ssen-powercuts-history-mvp/1.0 (+https://github.com/)"
 TIMEOUT_SECONDS = 30
+MAX_FEED_AGE_HOURS = 24
+SOURCE_TIMESTAMP_KEYS = (
+    "updated",
+    "updatedAt",
+    "lastUpdated",
+    "lastUpdatedAt",
+    "modifiedAt",
+    "loggedAt",
+    "faultLogTime",
+    "createdAt",
+)
 
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_source_timestamp(value: Any) -> datetime | None:
+    if not value:
+        return None
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    elif len(raw) >= 5 and raw[-5] in {"+", "-"} and raw[-3] != ":":
+        raw = f"{raw[:-2]}:{raw[-2:]}"
+
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def newest_source_timestamp(outages: list[dict[str, Any]]) -> datetime | None:
+    timestamps: list[datetime] = []
+
+    for outage in outages:
+        for key in SOURCE_TIMESTAMP_KEYS:
+            parsed = parse_source_timestamp(outage.get(key))
+            if parsed:
+                timestamps.append(parsed)
+
+    return max(timestamps, default=None)
+
+
+def validate_feed_freshness(outages: list[dict[str, Any]], now: datetime) -> None:
+    if not outages:
+        print("Feed returned no outage records; skipping freshness check")
+        return
+
+    newest = newest_source_timestamp(outages)
+    if not newest:
+        keys = sorted({key for outage in outages for key in outage.keys()})
+        raise RuntimeError(
+            "Could not find any parseable source timestamps in outage feed. "
+            f"Checked keys: {', '.join(SOURCE_TIMESTAMP_KEYS)}. "
+            f"Feed keys included: {', '.join(keys[:40])}"
+        )
+
+    age = now - newest
+    print(f"Newest source outage timestamp: {newest.isoformat().replace('+00:00', 'Z')}")
+    print(f"Source feed age: {age.total_seconds() / 3600:.1f} hours")
+
+    max_age = timedelta(hours=MAX_FEED_AGE_HOURS)
+    if age > max_age:
+        raise RuntimeError(
+            "Outage feed appears stale: newest source timestamp is "
+            f"{newest.isoformat().replace('+00:00', 'Z')}, which is "
+            f"{age.total_seconds() / 3600:.1f} hours old. "
+            f"Maximum allowed age is {MAX_FEED_AGE_HOURS} hours."
+        )
 
 
 def normalize_postcode(value: str) -> str:
@@ -254,11 +328,13 @@ def insert_snapshot(conn: Any, fetched_at_utc: str, outage_count: int, source_ur
 
 
 def main() -> int:
-    now_iso = utc_now_iso()
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now_iso = now.isoformat().replace("+00:00", "Z")
 
     try:
         outages = fetch_json(SOURCE_URL)
         print(f"Fetched {len(outages)} outage records")
+        validate_feed_freshness(outages, now)
 
         init_db()
         conn = get_connection()
