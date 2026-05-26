@@ -32,9 +32,15 @@ jobs:
           restore-keys: |
             powercuts-db-
 
-      - name: Seed outage database when cache is missing
-        if: steps.outage_db_cache.outputs.cache-hit != 'true'
+      - name: Seed outage database when no cache file exists
         run: |
+          if [ -s data/powercuts.db ]; then
+            echo "Using restored outage database cache"
+            ls -lh data/powercuts.db
+            exit 0
+          fi
+
+          echo "No outage database cache restored; seeding from last tracked database"
           mkdir -p data
           git show 728ebb3ba50ee7230c686d9663de8b52cfc30e4c:data/powercuts.db > data/powercuts.db
           ls -lh data/powercuts.db
@@ -64,17 +70,22 @@ jobs:
       - name: Build dashboard data
         run: python scripts/export_dashboard.py
 
-      - name: Decide export commit scope
+      - name: Decide commit scope
         id: commit_scope
         run: |
           hour=$(date -u +%H)
           minute=$(date -u +%M)
+          echo "commit_dashboard=false" >> "$GITHUB_OUTPUT"
           echo "commit_exports=false" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$minute" = "03" ]; then
+            echo "commit_dashboard=true" >> "$GITHUB_OUTPUT"
+          fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || { [ "$hour" = "00" ] && [ "$minute" = "03" ]; }; then
             echo "commit_exports=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit dashboard data
+        if: steps.commit_scope.outputs.commit_dashboard == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
