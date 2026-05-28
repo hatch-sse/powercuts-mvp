@@ -73,16 +73,8 @@ jobs:
       - name: Decide commit scope
         id: commit_scope
         run: |
-          hour=$(date -u +%H)
-          minute=$(date -u +%M)
-          echo "commit_dashboard=false" >> "$GITHUB_OUTPUT"
-          echo "commit_exports=false" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$minute" = "03" ]; then
-            echo "commit_dashboard=true" >> "$GITHUB_OUTPUT"
-          fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || { [ "$hour" = "00" ] && [ "$minute" = "03" ]; }; then
-            echo "commit_exports=true" >> "$GITHUB_OUTPUT"
-          fi
+          echo "commit_dashboard=true" >> "$GITHUB_OUTPUT"
+          echo "commit_exports=true" >> "$GITHUB_OUTPUT"
 
       - name: Commit dashboard data
         if: steps.commit_scope.outputs.commit_dashboard == 'true'
