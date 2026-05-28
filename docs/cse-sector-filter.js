@@ -1,9 +1,13 @@
-// Applies the active PSR CSE filters to the postcode-sector power cut layer.
-// This keeps the blue postcode-sector polygons, cards, Top sectors list and campaign exports
-// aligned with the selected CSE local-authority criteria.
+// Applies a dedicated PSR CSE filter to the postcode-sector power cut layer when present.
+// The standard PSR CSE overlay should not remove power cut sectors by itself.
 
 function cseSectorFilterIsEnabled() {
-  return Boolean(document.getElementById("cseToggle")?.checked) && typeof window.cseVisibleRows === "function";
+  const filterToggle = document.getElementById("cseFilterPowercuts");
+  return (
+    Boolean(document.getElementById("cseToggle")?.checked) &&
+    Boolean(filterToggle?.checked) &&
+    typeof window.cseVisibleRows === "function"
+  );
 }
 
 function cseSectorVisibleAuthorityCodes() {
