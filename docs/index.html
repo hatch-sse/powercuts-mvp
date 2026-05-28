@@ -1,211 +1,187 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SSEN Power Interruption History MVP</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SSEN Power Interruption Insights</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="ux-fixes.css?v=5" />
 </head>
 <body>
-  <header>
-    <div>
-      <p class="eyebrow">SSEN Distribution</p>
-      <h1>Power interruption history</h1>
-      <p class="subtitle">Rolling power cut insights by postcode sector for campaign planning and analysis.</p>
-    </div>
-    <div class="freshness" id="freshnessNote">Loading...</div>
-  </header>
+  <main class="shell">
+    <header class="portal-hero">
+      <div class="portal-hero-grid">
+        <div class="portal-intro">
+          <div class="portal-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <p class="eyebrow">SSEN outage history</p>
+          <h1>Power interruption insights</h1>
+          <p class="lede">Explore recent SSEN power interruption history by postcode sector, filter by date range and network, and export Meta-ready targeting sectors.</p>
+          <p id="freshnessNote" class="freshness">Loading latest update…</p>
+        </div>
+        <section class="cards cards-top">
+          <article class="card"><strong id="sectorsCard">–</strong><span>Postcode sectors</span></article>
+          <article class="card"><strong id="outagesCard">–</strong><span>Total outages</span></article>
+          <article class="card"><strong id="customersCard">–</strong><span>Customers affected</span></article>
+          <article class="card"><strong id="timeCard">–</strong><span>Total time off supply (hrs)</span></article>
+        </section>
+      </div>
+    </header>
 
-  <main>
-    <section class="controls-card">
-      <div class="controls-grid">
-        <label>
-          Start date
-          <input id="startDate" type="date" />
+    <section class="workspace">
+      <section class="filter-card">
+        <label>Start date
+          <input type="date" id="startDate" />
         </label>
-        <label>
-          End date
-          <input id="endDate" type="date" />
+        <label>End date
+          <input type="date" id="endDate" />
         </label>
-        <label>
-          Network
+        <div class="quick-ranges inline-ranges" aria-label="Quick date ranges">
+          <button class="secondary small" data-range="7">Last 7 days</button>
+          <button class="secondary small" data-range="30">Last 30 days</button>
+          <button class="secondary small" data-range="90">Last 90 days</button>
+          <button class="secondary small" data-range="ytd">Year to date</button>
+        </div>
+
+        <div class="filter-break" aria-hidden="true"></div>
+
+        <label>Network
           <select id="networkSelect">
-            <option value="ALL">All SSEN Distribution</option>
-            <option value="SHEPD">SHEPD - north of Scotland</option>
-            <option value="SEPD">SEPD - central southern England</option>
+            <option value="ALL">All</option>
+            <option value="SHEPD">SHEPD</option>
+            <option value="SEPD">SEPD</option>
           </select>
         </label>
-        <label>
-          Power cut type
-          <select id="outageTypeSelect">
-            <option value="ALL">All types</option>
-            <option value="PLANNED">Planned</option>
-            <option value="UNPLANNED">Unplanned</option>
-            <option value="MULTIPLE">Multiple/unknown</option>
-          </select>
-        </label>
-        <label>
-          Metric
+        <label>Metric
           <select id="metricSelect">
-            <option value="time_off_supply_hours_total_approx">Total time off supply</option>
             <option value="outage_count">Outages</option>
             <option value="total_customers_affected">Customers affected</option>
+            <option value="time_off_supply_hours_total_approx">Total time off supply</option>
           </select>
         </label>
-        <label>
-          Hotspot limit
+        <label>Hotspot view
           <select id="hotspotLimit">
-            <option value="ALL">All matching sectors</option>
-            <option value="250">Top 250</option>
-            <option value="100">Top 100</option>
-            <option value="50">Top 50</option>
+            <option value="ALL">Show all sectors</option>
+            <option value="10">Top 10</option>
             <option value="25">Top 25</option>
+            <option value="50">Top 50</option>
+            <option value="100">Top 100</option>
+            <option value="250">Top 250</option>
+            <option value="500">Top 500</option>
+            <option value="1000">Top 1000</option>
           </select>
         </label>
-      </div>
-
-      <div class="quick-ranges" aria-label="Quick date filters">
-        <button class="secondary" data-range="30">Last 30 days</button>
-        <button class="secondary" data-range="90">Last 90 days</button>
-        <button class="secondary" data-range="180">Last 180 days</button>
-        <button class="secondary" data-range="365">Last 12 months</button>
-        <button class="secondary" data-range="ytd">Year to date</button>
-      </div>
-
-      <div class="thresholds">
-        <label>
-          Minimum outages
-          <input id="minOutages" type="number" min="0" value="0" />
+        <label>Power cut type
+          <select id="outageTypeSelect">
+            <option value="ALL">All types</option>
+            <option value="HV">HV</option>
+            <option value="LV">LV</option>
+            <option value="PSI">PSI</option>
+          </select>
         </label>
-        <label>
-          Minimum customers affected
-          <input id="minCustomers" type="number" min="0" value="0" />
+        <label class="toggle-label cse-toggle-label">PSR CSE data
+          <input type="checkbox" id="cseToggle" />
         </label>
-        <label>
-          Minimum time off supply (hours)
-          <input id="minHours" type="number" min="0" value="0" />
-        </label>
-      </div>
-    </section>
 
-    <section class="lookup-card">
-      <label>
-        Find a postcode, sector or power cut reference
-        <div class="lookup-row">
-          <input id="postcodeSearch" type="search" placeholder="e.g. IV30 1, IV30 or SSEN reference" autocomplete="off" />
-          <button id="postcodeSearchBtn" type="button">Search</button>
+        <div class="filter-break cse-controls" hidden aria-hidden="true"></div>
+
+        <label class="cse-controls" hidden>Needs group
+          <select id="cseNeedSelect">
+            <option value="overall">Overall</option>
+            <option value="over_65">Over 65</option>
+            <option value="disability">Disability</option>
+            <option value="child_under_5">Child under 5</option>
+            <option value="no_english">No English</option>
+            <option value="partial_sight">Partial sight</option>
+            <option value="blind">Blind</option>
+            <option value="hearing_impaired">Hearing impaired</option>
+            <option value="dementia">Dementia</option>
+            <option value="mental_health">Mental health</option>
+          </select>
+        </label>
+        <label class="cse-controls" hidden>Maximum PSR reach %
+          <input id="cseReachThreshold" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="e.g. 75" />
+        </label>
+        <label class="cse-controls" hidden>Council area
+          <select id="cseCouncilSearch">
+            <option value="ALL">All council areas</option>
+          </select>
+        </label>
+        <label class="toggle-label cse-controls" hidden>Power cut overlap
+          <input type="checkbox" id="csePowercutOnly" />
+          <span>Hide power cut layer</span>
+        </label>
+
+        <div class="filter-break" aria-hidden="true"></div>
+
+        <div class="embedded-search">
+          <div class="search-heading">
+            <h2>Search</h2>
+            <p class="note">Search by full postcode, partial postcode, postcode sector, or power cut reference such as TC9063.</p>
+          </div>
+          <div class="lookup-controls">
+            <input id="postcodeSearch" type="text" placeholder="e.g. AB31 4AA, AB31, or TC9063" autocomplete="postal-code" />
+            <button id="postcodeSearchBtn">Search</button>
+          </div>
+          <div id="postcodeResult" class="lookup-result note" hidden></div>
         </div>
-      </label>
-      <div id="postcodeResult" class="postcode-result" hidden></div>
-    </section>
-
-    <section class="summary-grid" aria-label="Summary metrics">
-      <article>
-        <span>Sectors</span>
-        <strong id="sectorsCard">-</strong>
-      </article>
-      <article>
-        <span>Outages</span>
-        <strong id="outagesCard">-</strong>
-      </article>
-      <article>
-        <span>Customers affected</span>
-        <strong id="customersCard">-</strong>
-      </article>
-      <article>
-        <span>Total time off supply</span>
-        <strong id="timeCard">-</strong>
-      </article>
-    </section>
-
-    <section class="layout">
-      <section class="map-panel">
-        <div id="map" aria-label="Map of postcode sectors"></div>
-        <div class="legend" id="legend">
-          <strong id="legendTitle">Metric</strong>
-          <span>Light = lower</span>
-          <span>Dark = higher</span>
-        </div>
-        <div id="emptyState" class="empty-state" hidden></div>
       </section>
 
-      <aside>
-        <section class="detail-card">
-          <h2>Selected sector</h2>
-          <p id="sectorDetail" class="note">Select a sector on the map or table to see details.</p>
-        </section>
-
-        <section class="detail-card cse-panel">
-          <h2>PSR CSE overlay</h2>
-          <label class="checkbox-row">
-            <input id="cseToggle" type="checkbox" />
-            Show local authority PSR CSE reach
-          </label>
-          <div class="cse-controls" hidden>
-            <label>
-              Needs group
-              <select id="cseNeedSelect">
-                <option value="overall">Overall</option>
-                <option value="over_65">Over 65</option>
-                <option value="disability">Disability</option>
-                <option value="child_under_5">Child under 5</option>
-                <option value="no_english">No English</option>
-                <option value="partial_sight">Partial sight</option>
-                <option value="blind">Blind</option>
-                <option value="hearing_impaired">Hearing impaired</option>
-                <option value="dementia">Dementia</option>
-                <option value="mental_health">Mental health</option>
-              </select>
-            </label>
-            <label>
-              Max PSR reach %
-              <input id="cseReachThreshold" type="number" min="0" max="100" step="1" placeholder="e.g. 75" />
-            </label>
-            <label>
-              Council area
-              <select id="cseCouncilSearch"><option value="ALL">All council areas</option></select>
-            </label>
-            <label class="checkbox-row">
-              <input id="csePowercutOnly" type="checkbox" />
-              Hide power cut layer
-            </label>
+      <section class="dashboard">
+        <div class="map-wrap">
+          <div id="map"></div>
+          <div class="legend" aria-label="Map colour legend">
+            <strong id="legendTitle">Outages</strong>
+            <div class="legend-scale"></div>
+            <div class="legend-row"><span>Lower</span><span>Higher</span></div>
+            <div class="legend-boundary"><span class="legend-boundary-line"></span><span>Licence boundary</span></div>
           </div>
-          <p id="cseSummary" class="note">Switch on PSR CSE data to show local authority reach and campaign priority.</p>
-          <button id="downloadCseAuthoritiesBtn" class="secondary">Download CSE authorities CSV</button>
-          <button id="downloadCseCampaignBtn" class="secondary">Download combined campaign CSV</button>
-        </section>
-
-        <h2>Top sectors</h2>
-        <p id="metricNote" class="note"></p>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Postcode sector</th><th>Network</th><th id="metricHeader">Metric</th></tr></thead>
-            <tbody id="topTable"></tbody>
-          </table>
+          <div id="emptyState" class="empty-state" hidden></div>
         </div>
+        <aside class="panel">
+          <section class="detail-card">
+            <h2>Selected sector</h2>
+            <div id="sectorDetail" class="note">Click a sector on the map or in the Top sectors list to see more detail, including full postcodes and power cut references.</div>
+          </section>
 
-        <h2>Campaign exports</h2>
-        <section class="detail-card export-card">
-          <h2>Meta sectors</h2>
-          <p id="metaCount" class="note">0 postcode sectors ready for Meta Ads.</p>
-          <button id="copyMetaBtn">Copy Meta sectors</button>
-          <button id="downloadMetaBtn" class="secondary">Download Meta TXT</button>
-          <button id="downloadMetaCsvBtn" class="secondary">Download Meta CSV</button>
-        </section>
+          <section id="csePanel" class="detail-card export-card cse-controls" hidden>
+            <h2>PSR CSE data</h2>
+            <p id="cseSummary" class="note">Switch on PSR CSE data to show local authority reach and campaign priority.</p>
+            <button id="downloadCseAuthoritiesBtn" class="secondary">Download CSE authorities CSV</button>
+            <button id="downloadCseCampaignBtn" class="secondary">Download combined campaign CSV</button>
+          </section>
 
-        <section class="detail-card export-card">
-          <h2>Door drop postcodes</h2>
-          <p id="doorDropCount" class="note">0 full postcodes ready for door-drop planning.</p>
-          <button id="copyDoorDropBtn">Copy full postcodes</button>
-          <button id="downloadDoorDropTxtBtn" class="secondary">Download door drop TXT</button>
-          <button id="downloadDoorDropCsvBtn" class="secondary">Download door drop CSV</button>
-          <p class="note">Door-drop exports contain full postcodes linked to power interruption history. Use only for approved customer communications and campaign planning.</p>
-        </section>
+          <h2>Top sectors</h2>
+          <p id="metricNote" class="note"></p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Postcode sector</th><th>Network</th><th id="metricHeader">Metric</th></tr></thead>
+              <tbody id="topTable"></tbody>
+            </table>
+          </div>
 
-        <button id="downloadCsvBtn" class="secondary" hidden aria-hidden="true" tabindex="-1">Download current table as CSV</button>
-        <textarea id="metaOutput" readonly placeholder="Export outputs will appear here after copying/exporting."></textarea>
-      </aside>
+          <h2>Campaign exports</h2>
+          <section class="detail-card export-card">
+            <h2>Meta sectors</h2>
+            <p id="metaCount" class="note">0 postcode sectors ready for Meta Ads.</p>
+            <button id="copyMetaBtn">Copy Meta sectors</button>
+            <button id="downloadMetaBtn" class="secondary">Download Meta TXT</button>
+            <button id="downloadMetaCsvBtn" class="secondary">Download Meta CSV</button>
+          </section>
+
+          <section class="detail-card export-card">
+            <h2>Door drop postcodes</h2>
+            <p id="doorDropCount" class="note">0 full postcodes ready for door-drop planning.</p>
+            <button id="copyDoorDropBtn">Copy full postcodes</button>
+            <button id="downloadDoorDropTxtBtn" class="secondary">Download door drop TXT</button>
+            <button id="downloadDoorDropCsvBtn" class="secondary">Download door drop CSV</button>
+            <p class="note">Door-drop exports contain full postcodes linked to power interruption history. Use only for approved customer communications and campaign planning.</p>
+          </section>
+
+          <button id="downloadCsvBtn" class="secondary" hidden aria-hidden="true" tabindex="-1">Download current table as CSV</button>
+          <textarea id="metaOutput" readonly placeholder="Export outputs will appear here after copying/exporting."></textarea>
+        </aside>
+      </section>
     </section>
 
     <details class="about-card">
