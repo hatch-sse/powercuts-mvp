@@ -2,6 +2,14 @@ name: Poll outages
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/poll.yml"
+      - "scripts/**"
+      - "schema.sql"
+      - "requirements.txt"
   schedule:
     - cron: "3,13,23,33,43,53 * * * *"
 
