@@ -1,5 +1,5 @@
 postcode_sector,network,outage_type,outage_count,total_customers_affected,time_off_supply_hours_total_approx
-GU8 4,SEPD,"HV,LV,PSI",10,250,659.87
+GU8 4,SEPD,"HV,LV,PSI",10,250,886.12
 GU7 1,SEPD,"LV,PSI",6,251,612.88
 RG26 5,SEPD,"HV,LV,PSI",11,2319,331.05
 BH24 3,SEPD,"HV,LV,PSI",24,960,110.52
