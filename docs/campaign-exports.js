@@ -35,12 +35,11 @@ function getVisibleCampaignSectors() {
 }
 
 function cseCampaignFilterEnabled() {
-  return Boolean(document.getElementById("cseToggle")?.checked) && typeof window.cseVisibleRows === "function";
+  return typeof window.cseSectorFilterIsEnabled === "function" && window.cseSectorFilterIsEnabled();
 }
 
 function getVisibleCseAuthorityCodes() {
-  if (!cseCampaignFilterEnabled()) return null;
-  return new Set(window.cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
+  return cseCampaignFilterEnabled() ? window.cseSectorVisibleAuthorityCodes() : null;
 }
 
 function campaignPostcodeDetails(row) {

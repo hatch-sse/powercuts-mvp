@@ -12,36 +12,28 @@ function cseSectorFilterIsEnabled() {
 
 function cseSectorVisibleAuthorityCodes() {
   if (!cseSectorFilterIsEnabled()) return null;
-  const codes = new Set(window.cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
-  return codes.size ? codes : null;
+  // An empty set means no matches; only null means filtering is disabled.
+  return new Set(window.cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
 }
 
-function cseSectorRowAuthorityCodes(row) {
-  const codes = new Set();
-  const details = Array.isArray(row.full_postcodes_detail) ? row.full_postcodes_detail : [];
+function cseFilterSectorPostcodes(rows, visibleAuthorityCodes) {
+  if (visibleAuthorityCodes === null) return rows;
 
-  for (const detail of details) {
-    if (detail.local_authority_code) codes.add(detail.local_authority_code);
-  }
-
-  String(row.local_authority_code || "")
-    .split(";")
-    .map((code) => code.trim())
-    .filter(Boolean)
-    .forEach((code) => codes.add(code));
-
-  return codes;
-}
-
-function cseSectorRowsHaveAuthorityCodes(rows) {
-  return rows.some((row) => cseSectorRowAuthorityCodes(row).size > 0);
-}
-
-function cseSectorRowMatches(row, visibleAuthorityCodes) {
-  if (!visibleAuthorityCodes) return true;
-  const rowCodes = cseSectorRowAuthorityCodes(row);
-  if (!rowCodes.size) return false;
-  return [...rowCodes].some((code) => visibleAuthorityCodes.has(code));
+  // Intersect after all outage thresholds, ranking and Top N limits. Never
+  // refill excluded sectors or expand a sector from an authority-wide lookup.
+  return rows.flatMap((row) => {
+    const details = campaignPostcodeDetails(row).filter((detail) =>
+      visibleAuthorityCodes.has(detail.local_authority_code)
+    );
+    if (!details.length) return [];
+    return [{
+      ...row,
+      full_postcodes: campaignUnique(details.map((detail) => detail.postcode)),
+      full_postcodes_detail: details,
+      local_authority_code: campaignUnique(details.map((detail) => detail.local_authority_code)).join("; "),
+      local_authority_name: campaignUnique(details.map((detail) => detail.local_authority_name)).join("; "),
+    }];
+  });
 }
 
 (function initialiseCseSectorFiltering() {
@@ -52,13 +44,7 @@ function cseSectorRowMatches(row, visibleAuthorityCodes) {
       const rows = originalGetFilteredSectors();
       const visibleAuthorityCodes = cseSectorVisibleAuthorityCodes();
 
-      if (!visibleAuthorityCodes) return rows;
-
-      // Older cached dashboard JSON may not yet contain local_authority_code on outage postcodes.
-      // Do not blank the map in that case; the filter will activate once the refreshed dashboard data is deployed.
-      if (!cseSectorRowsHaveAuthorityCodes(rows)) return rows;
-
-      return rows.filter((row) => cseSectorRowMatches(row, visibleAuthorityCodes));
+      return cseFilterSectorPostcodes(rows, visibleAuthorityCodes);
     };
   }
 
@@ -69,12 +55,12 @@ function cseSectorRowMatches(row, visibleAuthorityCodes) {
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    ["cseToggle", "cseNeedSelect", "cseReachThreshold", "cseCouncilSearch", "csePowercutOnly"].forEach((id) => {
+    ["cseToggle", "cseFilterPowercuts", "cseNeedSelect", "cseReachThreshold", "cseCouncilSearch", "csePowercutOnly"].forEach((id) => {
       const element = document.getElementById(id);
       if (!element) return;
 
-      element.addEventListener("change", () => window.setTimeout(refreshPowercutSectorsAfterCseChange, 450));
-      element.addEventListener("input", () => window.setTimeout(refreshPowercutSectorsAfterCseChange, 450));
+      element.addEventListener("change", refreshPowercutSectorsAfterCseChange);
+      element.addEventListener("input", refreshPowercutSectorsAfterCseChange);
     });
   });
 })();
