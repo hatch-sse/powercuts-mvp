@@ -1,0 +1,12 @@
+postcode_sector,network,outage_type,outage_count,total_customers_affected,time_off_supply_hours_total_approx
+PA23 7,SHEPD,HV,1,5,0.53
+PA23 8,SHEPD,HV,1,5,0.53
+AB38 7,SHEPD,HV,1,340,0.0
+AB38 9,SHEPD,HV,1,340,0.0
+AB39 7,SHEPD,HV,1,340,0.0
+PO9 1,SEPD,HV,1,1927,0.0
+PO9 2,SEPD,HV,1,1927,0.0
+RG2 0,SEPD,LV,1,2,0.0
+RH13 0,SEPD,LV,1,9,0.0
+SO20 8,SEPD,LV,1,30,0.0
+SO45 6,SEPD,LV,1,16,0.0
