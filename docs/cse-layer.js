@@ -309,7 +309,7 @@ function sectorAuthorityCodes(sector) {
 
 function buildCseCampaignCsv() {
   const need = document.getElementById("cseNeedSelect")?.value || "overall";
-  const rowsBySector = state.currentSectors || [];
+  const rowsBySector = getVisibleCampaignSectors();
   const visibleCseRowsByCode = new Map(cseVisibleRows().map((row) => [row.local_authority_code, row]));
   const headers = [
     "postcode_sector",
@@ -335,7 +335,9 @@ function buildCseCampaignCsv() {
         sector.postcode_sector,
         sector.network,
         sector.outage_count,
-        (sector.full_postcodes || []).join("; "),
+        campaignPostcodeDetails(sector)
+          .filter((detail) => detail.local_authority_code === authorityCode)
+          .map((detail) => detail.postcode).join("; "),
         cseRow.local_authority_code,
         cseRow.local_authority_name,
         need,
@@ -366,7 +368,9 @@ function setupCseControls() {
       }
     }
 
-    drawCseLayer();
+    // Refresh again after asynchronous data loading, however long it takes.
+    if (typeof window.updateAll === "function") window.updateAll();
+    else drawCseLayer();
   });
 
   ["cseNeedSelect", "cseReachThreshold", "cseCouncilSearch", "csePowercutOnly"].forEach((id) => {

@@ -1,6 +1,15 @@
 function cseAuthorityFilteredPowercutEvents() {
-  if (typeof getFilteredEvents === "function") return getFilteredEvents();
-  return state?.payload?.events || [];
+  // Preserve event metadata, but intersect with the thresholded, ranked and
+  // PSR-filtered sector/postcode population used by all campaign exports.
+  const allowedBySector = new Map(getVisibleCampaignSectors().map((row) => [
+    sectorKey(row), new Set(campaignPostcodeDetails(row).map((detail) => detail.postcode)),
+  ]));
+  return getFilteredEvents().flatMap((event) => {
+    const allowed = allowedBySector.get(sectorKey(event));
+    if (!allowed) return [];
+    const details = cseAuthorityEventPostcodeDetails(event).filter((detail) => allowed.has(detail.postcode));
+    return details.length ? [{ ...event, postcodes_detail: details }] : [];
+  });
 }
 
 function cseAuthorityEventPostcodeDetails(event) {
