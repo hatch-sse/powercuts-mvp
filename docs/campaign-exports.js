@@ -35,12 +35,11 @@ function getVisibleCampaignSectors() {
 }
 
 function cseCampaignFilterEnabled() {
-  return Boolean(document.getElementById("cseToggle")?.checked) && typeof window.cseVisibleRows === "function";
+  return typeof window.cseSectorFilterIsEnabled === "function" && window.cseSectorFilterIsEnabled();
 }
 
 function getVisibleCseAuthorityCodes() {
-  if (!cseCampaignFilterEnabled()) return null;
-  return new Set(window.cseVisibleRows().map((row) => row.local_authority_code).filter(Boolean));
+  return cseCampaignFilterEnabled() ? window.cseSectorVisibleAuthorityCodes() : null;
 }
 
 function campaignPostcodeDetails(row) {
@@ -61,20 +60,20 @@ function campaignSectorHasVisiblePostcodes(row, visibleCseCodes) {
   return campaignPostcodeDetails(row).some((detail) => visibleCseCodes.has(detail.local_authority_code));
 }
 
-function getMetaSectors() {
+function getMetaSectors(sectors = getVisibleCampaignSectors()) {
   const visibleCseCodes = getVisibleCseAuthorityCodes();
   return campaignUnique(
-    getVisibleCampaignSectors()
+    sectors
       .filter((row) => campaignSectorHasVisiblePostcodes(row, visibleCseCodes))
       .map((row) => String(row.postcode_sector || "").trim().toUpperCase())
   );
 }
 
-function getDoorDropRows() {
+function getDoorDropRows(sectors = getVisibleCampaignSectors()) {
   const rowsByPostcode = new Map();
   const visibleCseCodes = getVisibleCseAuthorityCodes();
 
-  for (const row of getVisibleCampaignSectors()) {
+  for (const row of sectors) {
     const refs = campaignUnique(row.outage_refs || []);
     const postcodeDetails = campaignPostcodeDetails(row);
 
@@ -163,8 +162,8 @@ function updateCampaignExportCounts() {
   const metaCount = document.getElementById("metaCount");
   const doorDropCount = document.getElementById("doorDropCount");
 
-  const sectors = getMetaSectors();
-  const postcodes = getDoorDropRows();
+  const sectors = getMetaSectors(state.currentSectors);
+  const postcodes = getDoorDropRows(state.currentSectors);
   const cseText = cseCampaignFilterEnabled() ? " matching the PSR CSE filters" : "";
 
   if (metaCount) {

@@ -1,28 +1,23 @@
-function cseAuthorityFilteredPowercutEvents() {
-  if (typeof getFilteredEvents === "function") return getFilteredEvents();
-  return state?.payload?.events || [];
-}
+function buildCseAuthorityPowercutPostcodes(sectors) {
+  // Preserve event metadata, but intersect with the thresholded, ranked and
+  // PSR-filtered sector/postcode population used by all campaign exports.
+  const allowedBySector = new Map(sectors.map((row) => [
+    sectorKey(row), new Set(campaignPostcodeDetails(row).map((detail) => detail.postcode)),
+  ]));
+  const rowsByAuthority = new Map();
+  if (!allowedBySector.size) return rowsByAuthority;
 
-function cseAuthorityEventPostcodeDetails(event) {
-  if (typeof eventPostcodeDetails === "function") return eventPostcodeDetails(event);
-  return (event.postcodes || []).map((postcode) => ({
-    postcode,
-    local_authority_code: event.local_authority_code || "",
-    local_authority_name: event.local_authority_name || "",
-  })).filter((detail) => detail.postcode);
-}
+  for (const event of getFilteredEvents()) {
+    const allowed = allowedBySector.get(sectorKey(event));
+    if (!allowed) continue;
 
-function cseAuthorityPowercutPostcodes(authorityCode) {
-  const rowsByPostcode = new Map();
+    for (const detail of eventPostcodeDetails(event)) {
+      const postcode = detail.postcode;
+      const authorityCode = detail.local_authority_code;
+      if (!authorityCode || !allowed.has(postcode)) continue;
 
-  for (const event of cseAuthorityFilteredPowercutEvents()) {
-    const details = cseAuthorityEventPostcodeDetails(event).filter((detail) => detail.local_authority_code === authorityCode);
-    if (!details.length) continue;
-
-    for (const detail of details) {
-      const postcode = String(detail.postcode || "").trim().toUpperCase();
-      if (!postcode) continue;
-
+      if (!rowsByAuthority.has(authorityCode)) rowsByAuthority.set(authorityCode, new Map());
+      const rowsByPostcode = rowsByAuthority.get(authorityCode);
       if (!rowsByPostcode.has(postcode)) {
         rowsByPostcode.set(postcode, {
           postcode,
@@ -50,7 +45,12 @@ function cseAuthorityPowercutPostcodes(authorityCode) {
     }
   }
 
-  return [...rowsByPostcode.values()].sort((a, b) => a.postcode.localeCompare(b.postcode));
+  return rowsByAuthority;
+}
+
+function cseAuthorityPowercutPostcodes(authorityCode, rowsByAuthority) {
+  const rows = rowsByAuthority.get(authorityCode);
+  return rows ? [...rows.values()].sort((a, b) => a.postcode.localeCompare(b.postcode)) : [];
 }
 
 function cseAuthorityPostcodeCsv(authorityCode) {
@@ -66,7 +66,7 @@ function cseAuthorityPostcodeCsv(authorityCode) {
     "last_seen",
   ];
 
-  const rows = cseAuthorityPowercutPostcodes(authorityCode).map((row) => [
+  const rows = cseAuthorityPowercutPostcodes(authorityCode, cseState.powercutPostcodesByAuthority).map((row) => [
     row.postcode,
     row.local_authority_code,
     row.local_authority_name,
@@ -89,21 +89,7 @@ function cseAuthorityDownloadFilename(authorityCode) {
     .replace(/^-|-$/g, "")}-powercut-postcodes.csv`;
 }
 
-function cseEnhancePopupHtml(html, row) {
-  const postcodeCount = cseAuthorityPowercutPostcodes(row.local_authority_code).length;
-  return `${html}<br/>
-    Power cut postcodes in current filters: ${cseEscapeHtml(cseFmt(postcodeCount))}<br/>
-    <button class="secondary small cse-postcode-download" data-authority-code="${cseEscapeHtml(row.local_authority_code)}">Download power cut postcodes</button>`;
-}
-
 (function initialiseCsePostcodeDownloads() {
-  if (typeof csePopupHtml === "function") {
-    const originalCsePopupHtml = csePopupHtml;
-    csePopupHtml = function wrappedCsePopupHtml(row) {
-      return cseEnhancePopupHtml(originalCsePopupHtml(row), row);
-    };
-  }
-
   document.addEventListener("click", (event) => {
     const button = event.target.closest(".cse-postcode-download");
     if (!button) return;
@@ -116,20 +102,11 @@ function cseEnhancePopupHtml(html, row) {
 
   document.addEventListener("DOMContentLoaded", () => {
     const powercutToggle = document.getElementById("csePowercutOnly");
-    const cseToggle = document.getElementById("cseToggle");
     const powercutLabel = powercutToggle?.closest("label");
 
     if (powercutLabel) {
       const textNode = [...powercutLabel.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (textNode) textNode.textContent = " Hide power cut layer";
     }
-
-    cseToggle?.addEventListener("change", () => {
-      if (!cseToggle.checked || !powercutToggle) return;
-      powercutToggle.checked = true;
-      window.setTimeout(() => {
-        if (typeof drawCseLayer === "function") drawCseLayer();
-      }, 0);
-    });
   });
 })();
