@@ -55,10 +55,10 @@ test('Top N and outage thresholds are applied before PSR, with no backfill',()=>
  h.elements.cseToggle.checked=h.elements.cseFilterPowercuts.checked=true;
  h.elements.cseCouncilSearch.value='B';
  assert.equal(h.json('getDoorDropRows()').length,1);
- assert.equal(h.json('cseAuthorityPowercutPostcodes("B")').length,1);
+ assert.equal(h.json('cseAuthorityPowercutPostcodes("B", buildCseAuthorityPowercutPostcodes(getFilteredSectors()))').length,1);
  h.elements.minOutages.value='3';
  assert.deepEqual(h.json('getDoorDropRows()'),[]);
- assert.deepEqual(h.json('cseAuthorityPowercutPostcodes("B")'),[]);
+ assert.deepEqual(h.json('cseAuthorityPowercutPostcodes("B", buildCseAuthorityPowercutPostcodes(getFilteredSectors()))'),[]);
 });
 test('missing mappings and unloaded/empty CSE data do not bypass active filter',()=>{
  const h=harness(); fixture(h); h.elements.cseToggle.checked=h.elements.cseFilterPowercuts.checked=true;
@@ -105,7 +105,49 @@ test('filter-control changes refresh synchronously and slow loading refreshes af
  h.elements.cseToggle.checked=true;
  const listeners=h.elements.cseToggle.listeners.change;
  const pending=listeners[listeners.length-1]({currentTarget:h.elements.cseToggle});
- assert.equal(h.ctx.refreshes,1);
- h.ctx.finishLoading(); await pending;
  assert.equal(h.ctx.refreshes,2);
+ h.ctx.finishLoading(); await pending;
+ assert.equal(h.ctx.refreshes,3);
+});
+
+test('one council postcode index per redraw serves every popup and CSV download', () => {
+  const h = harness();
+  fixture(h);
+  h.elements.cseToggle.checked = h.elements.cseFilterPowercuts.checked = true;
+  h.run(`
+    cseState.enabled = true;
+    cseState.boundaries = ['A', 'B'].map(code => ({ properties: { LAD24CD: code } }));
+    state.map = {};
+    updateCards = updateTable = updateMap = updateMetaCount = () => {};
+    const aggregate = aggregateEventsToSectors;
+    let aggregations = 0;
+    aggregateEventsToSectors = events => { aggregations++; return aggregate(events); };
+    const buildIndex = buildCseAuthorityPowercutPostcodes;
+    let indexBuilds = 0;
+    buildCseAuthorityPowercutPostcodes = sectors => { indexBuilds++; return buildIndex(sectors); };
+    let popups = [];
+    window.L = {
+      geoJSON(features, options) {
+        popups = [];
+        for (const feature of features.filter(options.filter)) {
+          options.onEachFeature(feature, { bindPopup: html => popups.push(html), on() {} });
+        }
+        return { addTo() { return this; }, remove() {} };
+      },
+    };
+    updateAll();
+  `);
+  assert.equal(h.run('aggregations'), 1);
+  assert.equal(h.run('indexBuilds'), 1);
+  assert.equal(h.run('popups.length'), 2);
+  assert.match(h.run('popups[1]'), /current filters: 2/);
+  assert.match(h.run('cseAuthorityPostcodeCsv("B")'), /"1; 2"/);
+  assert.equal(h.run('indexBuilds'), 1);
+
+  h.elements.hotspotLimit.value = '1';
+  h.run('updateAll()');
+  assert.equal(h.run('aggregations'), 2);
+  assert.equal(h.run('indexBuilds'), 2);
+  assert.match(h.run('popups[1]'), /current filters: 1/);
+  assert.doesNotMatch(h.run('cseAuthorityPostcodeCsv("B")'), /BB1/);
 });

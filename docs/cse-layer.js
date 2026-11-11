@@ -4,6 +4,7 @@ const CSE_DATA_FILE = "data/cse-local-authority-psr.json";
 const cseState = {
   boundaries: null,
   rowsByCode: new Map(),
+  powercutPostcodesByAuthority: new Map(),
   layer: null,
   enabled: false,
 };
@@ -117,12 +118,6 @@ function cseVisibleCodes() {
   return new Set(cseVisibleRows().map((row) => row.local_authority_code));
 }
 
-function updateCampaignCountsAfterCseChange() {
-  if (typeof window.updateCampaignExportCounts === "function") {
-    window.updateCampaignExportCounts();
-  }
-}
-
 function updateCseSummary() {
   const summary = document.getElementById("cseSummary");
   if (!summary) return;
@@ -189,6 +184,8 @@ function csePopupHtml(row) {
   const need = document.getElementById("cseNeedSelect")?.value || "overall";
   const values = row.needs?.[need] || {};
   const overall = row.needs?.overall || {};
+  const authorityCode = row.local_authority_code;
+  const postcodeCount = cseState.powercutPostcodesByAuthority.get(authorityCode)?.size || 0;
 
   return `
     <strong>${cseEscapeHtml(row.local_authority_name)}</strong><br/>
@@ -196,7 +193,9 @@ function csePopupHtml(row) {
     PSR reach: ${cseEscapeHtml(cseMetricDisplay(values.psr_reach))}<br/>
     PSR records: ${cseEscapeHtml(cseFmt(values.psr_records))}<br/>
     Eligibility estimate: ${cseEscapeHtml(cseFmt(values.eligibility_estimate))}<br/>
-    <br/>Overall PSR reach: ${cseEscapeHtml(csePct(overall.psr_reach))}
+    <br/>Overall PSR reach: ${cseEscapeHtml(csePct(overall.psr_reach))}<br/>
+    Power cut postcodes in current filters: ${cseEscapeHtml(cseFmt(postcodeCount))}<br/>
+    <button class="secondary small cse-postcode-download" data-authority-code="${cseEscapeHtml(authorityCode)}">Download power cut postcodes</button>
   `;
 }
 
@@ -210,10 +209,11 @@ function drawCseLayer() {
 
   if (!cseState.enabled || !cseState.boundaries || !state.map) {
     updateCseSummary();
-    updateCampaignCountsAfterCseChange();
+    cseState.powercutPostcodesByAuthority = new Map();
     return;
   }
 
+  cseState.powercutPostcodesByAuthority = buildCseAuthorityPowercutPostcodes(state.currentSectors);
   const visibleCodes = cseVisibleCodes();
 
   cseState.layer = L.geoJSON(cseState.boundaries, {
@@ -243,7 +243,6 @@ function drawCseLayer() {
   if (!csePowercutOverlapEnabled() && state.layer) state.layer.bringToFront();
   if (!csePowercutOverlapEnabled() && state.licenceLayer) state.licenceLayer.bringToFront();
   updateCseSummary();
-  updateCampaignCountsAfterCseChange();
 }
 
 function cseCsvEscape(value) {
@@ -357,27 +356,23 @@ function setupCseControls() {
     showCseControls(cseState.enabled);
 
     if (cseState.enabled) {
+      const powercutToggle = document.getElementById("csePowercutOnly");
+      if (powercutToggle) powercutToggle.checked = true;
+    }
+
+    if (cseState.enabled && !(cseState.boundaries && cseState.rowsByCode.size)) {
+      updateAll();
       try {
         await ensureCseDataLoaded();
       } catch (error) {
         console.error(error);
         const summary = document.getElementById("cseSummary");
         if (summary) summary.textContent = "Unable to load PSR CSE data files.";
-        updateCampaignCountsAfterCseChange();
         return;
       }
     }
 
-    // Refresh again after asynchronous data loading, however long it takes.
-    if (typeof window.updateAll === "function") window.updateAll();
-    else drawCseLayer();
-  });
-
-  ["cseNeedSelect", "cseReachThreshold", "cseCouncilSearch", "csePowercutOnly"].forEach((id) => {
-    const element = document.getElementById(id);
-    if (!element) return;
-    element.addEventListener("change", drawCseLayer);
-    element.addEventListener("input", drawCseLayer);
+    updateAll();
   });
 
   document.getElementById("cseReachThreshold")?.addEventListener("input", (event) => {

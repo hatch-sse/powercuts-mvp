@@ -55,12 +55,12 @@ function cseFilterSectorPostcodes(rows, visibleAuthorityCodes) {
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    ["cseToggle", "cseFilterPowercuts", "cseNeedSelect", "cseReachThreshold", "cseCouncilSearch", "csePowercutOnly"].forEach((id) => {
+    ["cseFilterPowercuts", "cseNeedSelect", "cseReachThreshold", "cseCouncilSearch", "csePowercutOnly"].forEach((id) => {
       const element = document.getElementById(id);
       if (!element) return;
 
-      element.addEventListener("change", refreshPowercutSectorsAfterCseChange);
-      element.addEventListener("input", refreshPowercutSectorsAfterCseChange);
+      const eventType = id === "cseReachThreshold" ? "input" : "change";
+      element.addEventListener(eventType, refreshPowercutSectorsAfterCseChange);
     });
   });
 })();
